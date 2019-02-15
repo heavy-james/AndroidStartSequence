@@ -1,0 +1,31 @@
+@startuml
+
+participant Init as "system/core/init/init.cpp"
+participant InitParser as "system/core/init/init_parser.cpp"
+
+Init -> InitParser :  action_for_each_trigger("early-init", action_add_queue_tail);
+
+InitParser -> InitParser : 找到early-init对应的action,\n并调用action_add_queue_tail\n添加action->qlist到action_queue中
+
+Init -> InitParser : queue_builtin_action(wait_for_coldboot_done_action, "wait_for_coldboot_done");
+
+InitParser -> InitParser : 将wait_for_coldboot_done_action函数指针作为命令回调，\n"wait_for_coldboot_done_action"作为trigger，\n添加到action_list尾部
+
+InitParser -> InitParser : 调用相同的action_add_queue_tail\n将创建action添加到action_queue中
+
+Init -> InitParser : 同样调用queue_builtin_action添加内置的action : \nmix_hwrng_into_linux_rng , keychord_init , console_init
+
+Init -> InitParser : 同样调用action_for_each_trigger添加"init"动作到队列
+
+Init -> InitParser : 重复添加mix_hwrng_into_linux_rng内置动作
+
+Init -> InitParser : 判断是否是充电模式，是则添加"charger"动作，否则添加"late-init"动作到队列
+
+Init -> InitParser : 添加queue_property_triggers内置动作到队列，\n这个动作会添加所有property:开头的属性相关的动作到队列
+
+Init -> Init : 下一步无限循环执行队列中的action，\naction中会通过命令启动service，\
+\n所有的service都会以init的子进程形式启动，\n由init启动的进程包括: \
+\nueventd、servicemanager 、nvold 、 zygote、 \
+\ninstalld 、rildaemon 、debuggerd 、bootanim等，通常称这些为守护进程
+
+@enduml

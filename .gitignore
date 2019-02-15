@@ -1,0 +1,13 @@
+/app/src/main/assets/build.prop
+
+local.properties
+*.iml
+.gradle
+/.idea/workspace.xml
+/.idea/libraries
+.idea/
+.DS_Store
+/build
+/captures
+app/.externalNativeBuild/*
+app/.externalNativeBuild

@@ -1,0 +1,23 @@
+@startuml
+
+participant Init as "system/core/init/init.cpp"
+
+-> Init : main()
+
+Init -> Init : init and queue actions...
+
+loop true
+
+    Init -> Init :  execute_one_command(); \
+    \n取出action中的command,调用action的函数指针指向的函数,\
+    \n并将解析得到的参数和参数个数传递给它
+
+    Init -> Init :  restart_processes();\
+    \n查找service_list中的flag为SERVICE_RESTARTING的服务，并调用服务对应的函数启动服务
+
+    Init -> Init : TEMP_FAILURE_RETRY(epoll_wait(epoll_fd, &ev, 1, timeout)\
+    \n重复调用epoll_wait，处理属性服务、子进程退出、keychord事件\
+
+end
+
+@enduml

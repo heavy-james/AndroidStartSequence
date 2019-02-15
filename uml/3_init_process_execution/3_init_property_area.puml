@@ -1,0 +1,30 @@
+@startuml
+
+participant Init as "system/core/init/init.cpp"
+participant PropertyService as "system/core/init/property_service.cpp"
+
+
+-> Init : main()
+
+Init -> Init : property_init()
+
+Init -> PropertyService :  __system_property_area_init();
+
+PropertyService -> PropertyService : map_prop_area_rw();
+
+group map_prop_area_rw
+
+PropertyService -> PropertyService : const int fd = open(property_filename, \n O_RDWR | O_CREAT | O_NOFOLLOW | O_CLOEXEC | O_EXCL, 0444); \
+\n 打开属性文件
+
+PropertyService -> PropertyService : void *const memory_area = mmap(NULL, pa_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);\
+\n 将文件内容映射到memory_area地址，映射类型为共享类型
+
+PropertyService -> PropertyService : prop_area *pa = new(memory_area) prop_area(PROP_AREA_MAGIC, PROP_AREA_VERSION);\
+\n 使用该地址创建一个prop_area结构体示例，c++ placement new 用法.
+
+PropertyService -> PropertyService : __system_property_area__ = pa; 缓存获取的结构体指针
+
+end
+
+@enduml

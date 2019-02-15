@@ -1,0 +1,130 @@
+@startuml
+
+participant Init as "init.cpp"
+
+participant InitRC as "init.rc"
+
+participant InitHWRC as "init.<hardware>.rc"
+
+participant BuiltIns as "builtins.cpp"
+
+participant Vdc as "vdc.c"
+
+participant Vold as "system/core/vold/main.cpp"
+
+participant CryptCommandListener as "CryptCommandListener.cpp"
+
+participant FrameworkListener as "FrameworkListener.cpp"
+
+participant SocketListener as "SocketListener.cpp"
+
+participant InitZygote as "init.zygoted64.rc"
+
+note over Init : -Psystem/core/init
+
+note over InitHWRC : -Pdevice/xx/hardware
+
+note over InitZygote : -Psystem/core/rootdir
+
+Init -> InitRC: main() \n enqueue action late-init
+
+InitRC -> InitHWRC : late-init trigger action fs
+
+InitHWRC -> BuiltIns : mount_all /fstab.x_hardware \
+    \n call do_mount_all(int nargs, char **args)
+
+alt ret
+
+else NOT_ENCRYPTED | DEFAULT_FILE_ENCRYPTED
+
+BuiltIns -> InitRC : trigger nonencrypted
+
+InitRC -> InitZygote : class_start main
+
+else NEEDS_ENCRYPTION
+
+BuiltIns -> InitRC :property_set("vold.decrypt", "trigger_encryption");
+
+InitRC -> InitRC : start defaultcrypto
+
+InitRC -> Vdc : call main() \n --wait cryptfs mountdefaultencrypted
+
+
+else MIGHT_BE_ENCRYPTED
+
+BuiltIns -> InitRC :property_set("vold.decrypt", "trigger_default_encryption");
+
+InitRC -> InitRC : start encrypt
+
+InitRC -> Vdc : call main() \n --wait cryptfs enablecrypto inplace default noui
+
+end
+
+Vdc -> InitRC : find socket with name "cryptd"
+
+InitRC -> InitRC : service vold /system/bin/vold \n socket cryptd stream 0660 root mount
+
+InitRC -> Vold : main()
+
+Vold -> Vold : NetlinkManager *nm = NetlinkManager::Instance()
+
+Vold -> Vold : cl = new CryptCommandListener();
+
+Vold -> Vold : nm->setBroadcaster(SocketListener *) cl)
+
+Vold -> SocketListener : startListener()
+
+SocketListener -> SocketListener : startListener(int backlog) //backlog = 4
+
+SocketListener -> SocketListener : mSock = android_get_control_socket(mSocketName) // mSocketName = vold
+
+SocketListener -> SocketListener : listen(mSock, backlog)
+
+Vdc -> Vdc : do_cmd(int sock, int argc, char **argv) \
+    \n [argc = 2, argv = "cryptfs mountdefaultencrypted"]\
+    \n [argc = 5, argv = "cryptfs enablecrypto inplace default noui]"
+
+Vdc -> FrameworkListener : onDataAvailable(SocketClient *c)
+
+FrameworkListener -> FrameworkListener : dispatchCommand(SocketClient *cli, char *data)
+
+FrameworkListener -> CryptCommandListener : runCommand(SocketClient *cli, int argc, char **argv)
+
+alt argv
+
+else mountdefaultencrypted
+
+CryptCommandListener -> CryptCommandListener : cryptfs_mount_default_encrypted();
+
+CryptCommandListener -> CryptCommandListener : option: property_set("vold.decrypt", "trigger_restart_min_framework");
+
+else enablecrypto
+
+CryptCommandListener -> CryptCommandListener : option : cryptfs_enable() \noption : cryptfs_enable_default()
+
+CryptCommandListener -> CryptCommandListener : cryptfs_enable_internal()
+
+end
+
+CryptCommandListener -> CryptCommandListener : option : cryptfs_restart_internal(int restart_main)
+
+CryptCommandListener -> InitRC : property_set("vold.decrypt", "trigger_restart_framework");
+
+InitRC -> InitZygote : class_start main
+
+
+group zygote
+
+    InitZygote -> InitZygote :service zygote /system/bin/app_process64 \
+            \n -Xzygote /system/bin --zygote --start-system-server \
+            \n class main \
+            \n socket zygote stream 660 root system \
+            \n onrestart write /sys/android_power/request_state wake \
+            \n onrestart write /sys/power/state on \
+            \n onrestart restart media \
+            \n onrestart restart netd \
+            \n writepid /dev/cpuset/foreground/tasks
+
+end
+
+@enduml

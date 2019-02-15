@@ -1,0 +1,45 @@
+@startuml
+
+
+participant Init as "system/core/init/init.c"
+
+
+group main()
+
+    Init -> Init : 1.初始化文件系统
+    note right of Init : 包括tmpfs,/dev/pts,/dev/socket,/proc,/sys
+
+    Init -> Init : 2.初始化日志系统
+    note right of Init : open_devnull_stdio(); \
+    \nklog_init(); \
+    \nklog_set_level(KLOG_NOTICE_LEVEL);
+
+    Init -> Init : 3.初始化属性区域
+
+    ref over Init
+    3_init_property_area.puml
+    end ref
+
+    Init -> Init : 4.解析init.rc,init.<hardware>.rc
+
+    ref over Init
+    4_parse_init_rc.puml
+    end ref
+
+    Init -> Init : 5.将Action根据early-init,init,late-init以及穿插的内置action放入队列中
+
+    ref over Init
+    5_queue_actions.puml
+    end ref
+
+    Init -> Init : 6.循环等待可执行队列的命令，执行action，启动service\
+    \n重启需要重启的进程和服务\
+    \n使用epoll_wait函数获取epoll_fd对应的读写事件,并调用事件的处理回调函数\
+    \n包括:keychord事件，子进程退出信号，属性服务。\
+    \nepoll_fd由上述三个服务使用register_epoll_handler函数注册，并有自己的回调
+
+    ref over Init
+    6_execute_actions.puml
+    end ref
+end
+@enduml

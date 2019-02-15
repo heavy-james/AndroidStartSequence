@@ -1,0 +1,148 @@
+@startuml
+
+participant Init as "Init.cpp"
+participant PropertyService as "property_service"
+participant KeyChords as "keychords"
+participant Encrypt as "encrypt"
+
+box "charger"
+participant Charger as "all charger"
+end box
+
+
+box "core" #LightBlue
+participant Core as "all core"
+participant Ueventd as "ueventd"
+participant Logd as "logd"
+participant Vold as "vold"
+end box
+
+box "main"
+participant Main as "all main"
+end box
+
+
+box "late_start" #LightBlue
+participant LateStart as "late_start"
+end box
+
+
+activate Init
+
+Init -> PropertyService : call start_property_service()
+activate PropertyService
+
+group trigger "early-init"
+Init -> Ueventd : start ueventd
+activate Ueventd
+end
+
+Init -> Init : wait_for_coldboot_done_action()
+
+Init -> Init : mix_hwrng_into_linux_rng_action()
+
+Init -> KeyChords : keychord_init_action()
+activate KeyChords
+
+Init -> Init : console_init_action()
+
+group trigger "init"
+
+Init -> Init : init file systems
+
+end
+Init -> Init : mix_hwrng_into_linux_rng_action()
+
+alt ro.bootmode
+
+else "charger"
+
+    Init -> Charger : trigger "charger"
+    activate Charger
+
+    deactivate Charger
+
+else Other
+    group trigger "late-init"
+            group trigger "early-fs"
+
+            end
+
+            group trigger "fs"
+
+                alt encrypt_type
+
+                else default encrypt
+                    Init -> PropertyService : property_set("vold.decrypt", "trigger_default_encryption")
+
+                else encrypted
+                    Init -> PropertyService : property_set("vold.decrypt", "trigger_encryption")
+
+                else no encrypt
+                    Init -> Main : class_start main
+                    activate Main
+                    deactivate Main
+
+                    Init -> LateStart : class_start late_start
+                    activate LateStart
+                    deactivate LateStart
+                end
+
+            end
+
+            group trigger "post-fs"
+                Init -> Logd : start logd
+                activate Logd
+            end
+
+            group trigger "post-fs-data"
+                Init -> Logd : start logd
+                Init -> Vold : start vold
+                activate Vold
+            end
+
+            group trigger "load_persist_props_action"
+                Init -> Logd : start logd
+                Init -> Logd : start logd-reinit
+            end
+
+            group trigger "firmware_mounts_complete"
+
+            end
+
+            group trigger "early-boot"
+
+            end
+
+            group trigger "boot"
+                Init -> Core : class_start core
+            end
+    end
+
+end
+
+group property_triggers
+
+Init -> PropertyService : call queue_property_triggers() \
+\n queue any action defined in init.rc, \
+\n and was set to property_service
+
+PropertyService -> Encrypt :  on property:vold.decrypt
+activate Encrypt
+deactivate Encrypt
+
+Encrypt -> Main : class_start main
+activate Main
+
+Encrypt -> LateStart : class_start late_start
+activate LateStart
+end
+
+deactivate Init
+deactivate PropertyService
+deactivate Ueventd
+deactivate KeyChords
+deactivate Logd
+deactivate Main
+deactivate LateStart
+@enduml

@@ -1,0 +1,87 @@
+@startuml
+
+participant Init as "system/core/init/init.cpp"
+participant InitParser as "system/core/init/init_parser.cpp"
+
+
+Init -> InitParser :  init_parse_config_file("/init.rc");
+
+InitParser -> InitParser : parse_config(path, data)
+
+group parse_config
+
+    InitParser -> InitParser : 创建import文件列表和遍历节点
+    note over InitParser : struct listnode import_list;\
+    \nstruct listnode *node;
+
+    InitParser -> InitParser : 创建参数数组和参数指针
+    note over InitParser : \
+    char *args[INIT_PARSER_MAXARGS];\
+    \nint nargs = 0;
+
+    InitParser -> InitParser : 创建并初始化解析状态结构体
+    note over InitParser : parse_state state;\
+    \n//xx.rc文件的描述符 \
+    \nstate.filename = fn;\
+    \n//初始化行指针 \
+    \nstate.line = 0;\
+    \n//初始化列指针\
+    \nstate.ptr = strdup(data.c_str()); \
+    \n//初始化token指针\
+    \nstate.nexttoken = 0;\
+    \n//初始化通用行解析回调函数，此处为空函数\
+    \nstate.parse_line = parse_line_no_op;
+
+    InitParser -> InitParser : 初始化import文件列表，并将列表指针放到当前文件的前面
+    note over InitParser : \
+    list_init(&import_list);\
+    \nstate.priv = &import_list;
+
+    loop true
+
+        InitParser -> InitParser : 取出下一个token
+
+        alt token
+        else T_EOF
+            note over InitParser : 文件结束
+            InitParser -> InitParser : 跳转到 parser_done，处理import文件的解析
+        else T_NEWLINE
+            note over InitParser : 解析完一行的token
+            InitParser -> InitParser : 根据第一个token，查找关键字
+            InitParser -> InitParser : 如果是Section，调用parse_new_section
+
+            group parse_new_section
+
+                group parse_service
+                    InitParser -> InitParser : 判断service配置的参数个数和格式
+                    InitParser -> InitParser : 通过service_find_by_name(args[1])查找缓存，找到则直接返回false，否则继续
+                    InitParser -> InitParser : 调用calloc为service分配内存，初始化service的名称参数触发器等通用设置
+                    InitParser -> InitParser : 添加到service_list
+                    InitParser -> InitParser : 调用parse_line_service初始化service的具体参数:\
+                    \n通过lookup_keyword查找参数对应的关键字，匹配keyword.h预定义，来初始化service
+                end
+
+                group parse_action
+                    InitParser -> InitParser : 调用calloc为action分配内存，初始化action的名称、触发器等通用设置
+                    InitParser -> InitParser : 添加到action_list
+                    InitParser -> InitParser : 调用parse_line_action初始化action的具体参数:\
+                    \n通过lookup_keyword查找参数对应的关键字，匹配keyword.h预定义，来初始化action
+                end
+
+                group parse_import
+                    InitParser -> InitParser : 处理文件导入相关逻辑
+                end
+
+            end
+
+        else T_TEXT
+            note over InitParser : 一个文本token
+            InitParser -> InitParser : 在最大参数个数以内，保存token到参数列表
+        end
+    end
+
+end
+
+InitParser -> InitParser : dump_parser_state(), \n打印action和service，默认关闭
+
+@enduml

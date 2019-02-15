@@ -1,0 +1,33 @@
+@startuml
+
+'participants below
+
+participant "PowerOn"
+
+participant "CpuInternalProgram" as CpuInPg
+
+participant "BootLoader"
+
+participant "Kernel"
+
+participant "InitProcess"
+
+participant "Zygote"
+
+participant "SystemServer"
+
+participant "Home"
+
+'sequence below
+
+PowerOn -> CpuInPg : 上电
+
+CpuInPg -> BootLoader : 根据硬件环境，加载对应位置的BootLoader
+
+BootLoader -> Kernel : 汇编程序引导，\n调用kernel/init/main.c#start_kernel()加载内核
+
+Kernel -> InitProcess : 调用kernel/init/main.c#rest_init()启动init进程
+
+
+
+@enduml

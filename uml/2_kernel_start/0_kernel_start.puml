@@ -1,0 +1,51 @@
+@startuml
+
+'style define below
+
+
+box "Assemble" #LightBlue
+participant Head as "kernel/arch/arm/head.S"
+participant HeadCommon as "kernel/arch/arm/head-common.S"
+end box
+
+box "C"
+participant Main as "kernel/init/main.c"
+participant Process as "kernel/common/arch/arm/kernel/process.c"
+participant Init as "system/core/init/init.c"
+end box
+
+group Load Kernel
+activate Head
+Head -> Head : __enable_mmu()
+Head -> HeadCommon : __turn_mmu_on()
+deactivate Head
+
+activate HeadCommon
+HeadCommon -> HeadCommon : __mmap_switched()
+end
+
+group Start Kernel
+HeadCommon -> Main : start_kernel()
+deactivate HeadCommon
+
+activate Main
+Main -> Main :  start_kernel做很多初始化动作
+Main -> Main : rest_init() 开始启动init进程
+Main -> Process : 调用kernel_thread()启动内核线程
+
+activate Process
+Main <- Process : 在内核线程回调kernel_init()函数
+deactivate Process
+
+Main -> Main : 调用init_post() 查找init程序位置，默认为/init
+Main -> Main : 调用run_init_process()
+Main -> Init : 调用内核方法kernel_execve()，执行/init程序，创建第一个用户进程
+deactivate Main
+
+note right of Init : /init 程序由system/core/init/init.c编译得到，\n至于为什么执行main方法，要看elf文件定义了
+Init -> : 执行入口main()函数
+
+end
+
+
+@enduml
