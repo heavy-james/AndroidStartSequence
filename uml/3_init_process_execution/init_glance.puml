@@ -26,6 +26,14 @@ box "late_start" #LightBlue
 participant LateStart as "late_start"
 end box
 
+note over Core : ueventd \n logd \n healthd \n console \n adbd \n lmkd\
+\n servicemanager \n vold \n surfaceflinger \n bootanim
+
+note over Main : netd \n debuggerd \n ril-daemon \n drm \n media\
+\n installd \n flash_recovery\n racoon\n mtpd \n keystore \
+\n dumpstate \n mdnsd,\n uncrypt,\n pre-recovery \n zygote
+
+note over LateStart : gatekeeperd,\n perfprofd,\n logcatd
 
 activate Init
 
