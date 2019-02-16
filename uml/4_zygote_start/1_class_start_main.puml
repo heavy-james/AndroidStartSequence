@@ -115,7 +115,7 @@ InitRC -> InitZygote : class_start main
 
 group zygote
 
-    InitZygote -> InitZygote :service zygote /system/bin/app_process64 \
+    InitZygote -> InitZygote : service zygote /system/bin/app_process64 \
             \n -Xzygote /system/bin --zygote --start-system-server \
             \n class main \
             \n socket zygote stream 660 root system \

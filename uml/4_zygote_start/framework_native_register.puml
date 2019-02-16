@@ -1,0 +1,74 @@
+@startuml
+participant AndroidRuntime as "AndroidRuntime.cpp"
+
+AndroidRuntime -> AndroidRuntime : define native method to register
+
+note over AndroidRuntime : static JNINativeMethod gMethods[] = {\
+\n    { "nativeFinishInit", "()V",\
+\n        (void*) com_android_internal_os_RuntimeInit_nativeFinishInit },\
+\n    { "nativeZygoteInit", "()V",\
+\n        (void*) com_android_internal_os_RuntimeInit_nativeZygoteInit },\
+\n    { "nativeSetExitWithoutCleanup", "(Z)V",\
+\n        (void*) com_android_internal_os_RuntimeInit_nativeSetExitWithoutCleanup },\
+\n};
+
+AndroidRuntime -> AndroidRuntime : define register function
+
+note over AndroidRuntime : \
+int register_com_android_internal_os_RuntimeInit(JNIEnv* env)\
+\n{\
+\n    return jniRegisterNativeMethods(env, "com/android/internal/os/RuntimeInit",\
+\n        gMethods, NELEM(gMethods));\
+\n}\
+
+
+AndroidRuntime -> AndroidRuntime : define struct RegJNIRec
+note over AndroidRuntime : //define struct contains one function pointer\
+    \n//which accepts arg JNIEnv* and return int  \
+    \nstruct RegJNIRec { \
+    \n    int (*mProc)(JNIEnv*); \
+    \n};
+
+AndroidRuntime -> AndroidRuntime : define macro REG_JNI
+note over AndroidRuntime : //define macro shorten RegJNIRec creating\
+\n #define REG_JNI(name)      { name }
+
+
+AndroidRuntime -> AndroidRuntime : define gRegJNI array\
+\ninclude all framework register function \
+\nmany functions defined in other files
+
+note over AndroidRuntime : static const RegJNIRec gRegJNI[] = { \
+    \nREG_JNI(register_com_android_internal_os_RuntimeInit), \
+    \nREG_JNI(register_android_os_SystemClock), \
+    \nREG_JNI(register_android_util_EventLog), \
+    \n ... \
+    \n}
+
+--> AndroidRuntime : startReg(env);
+
+ref over AndroidRuntime : 2_zygote_start.puml
+
+activate AndroidRuntime
+
+AndroidRuntime -> AndroidRuntime : androidSetCreateThreadFunc(...)
+
+note right of AndroidRuntime : set java thread create function, \
+    \nmake the thread created in this process,\
+    \nattached to JavaVM
+
+AndroidRuntime -> AndroidRuntime : register_jni_procs(gRegJNI, NELEM(gRegJNI), env)
+
+group register_jni_procs
+
+    loop size_t i = 0; i < NELEM(gRegJNI); i++
+        AndroidRuntime -> AndroidRuntime : gRegJNI [i]->mProc(env)
+        note right of AndroidRuntime : call the previously defined register function
+    end
+
+end
+
+deactivate AndroidRuntime
+
+
+@enduml

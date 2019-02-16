@@ -1,0 +1,98 @@
+@startuml
+participant ZygoteInit as "ZygoteInit.java"
+participant Zygote as "Zygote.java"
+participant ZygoteCpp as "com_android_internal_os_Zygote.cpp"
+participant ZygoteHooks as "ZygoteHooks.java"
+participant ZygoteHooksCC as "dalvik_system_ZygoteHooks.cc"
+participant RuntimeCC as "runtime.cc"
+
+activate ZygoteInit
+ZygoteInit -> Zygote : forkSystemServer(...)
+deactivate ZygoteInit
+
+ref over Zygote : system_server_start.puml
+
+
+activate Zygote
+Zygote -> Zygote : nativeForkSystemServer(...)
+note right of Zygote : call native method registered, see the reference.
+ref over Zygote : framework_native_register.puml
+Zygote --> ZygoteCpp : com_android_internal_os_Zygote_nativeForkSystemServer(...)
+deactivate Zygote
+
+activate ZygoteCpp
+ZygoteCpp -> ZygoteCpp : ForkAndSpecializeCommon(...)
+
+group ForkAndSpecializeCommon
+
+ZygoteCpp -> ZygoteCpp : SetSigChldHandler()
+note right of ZygoteCpp : we are still in zygote now\
+\nset signal handler for child process\
+\nif it (system_server) crashed\
+\nkill self to restart self and child
+
+ZygoteCpp -> ZygoteCpp : __android_log_close();
+ZygoteCpp -> ZygoteCpp : gOpenFdTable = FileDescriptorTable::Create() \
+\ncreate file descriptor table for first start
+
+ZygoteCpp -> ZygoteCpp : pid_t pid = fork();
+
+alt pid
+else pid == 0 //in child process
+
+ZygoteCpp -> ZygoteCpp : do fork clean actions
+ZygoteCpp -> ZygoteCpp : do runtime condition check
+ZygoteCpp -> ZygoteCpp : SetGids(env, javaGids);
+ZygoteCpp -> ZygoteCpp : SetRLimits(env, javaRlimits);
+ZygoteCpp -> ZygoteCpp : SetCapabilities(env, permittedCapabilities, effectiveCapabilities);
+ZygoteCpp -> ZygoteCpp : SetSchedulerPolicy(env);
+ZygoteCpp -> ZygoteCpp : selinux_android check
+ZygoteCpp -> ZygoteCpp : UnsetSigChldHandler();
+
+ZygoteCpp -> Zygote : CallStaticVoidMethod (gZygoteClass, gCallPostForkChildHooks, \
+\n              debug_flags, is_system_server ? NULL : instructionSet);
+
+deactivate ZygoteCpp
+
+activate Zygote
+Zygote --> Zygote : callPostForkChildHooks(...)
+Zygote -> ZygoteHooks : postForkChild(...)
+deactivate Zygote
+
+activate ZygoteHooks
+ZygoteHooks -> ZygoteHooks : nativePostForkChild(...)
+ZygoteHooks --> ZygoteHooksCC : ZygoteHooks_nativePostForkChild(...)
+deactivate ZygoteHooks
+
+activate ZygoteHooksCC
+ZygoteHooksCC -> ZygoteHooksCC : Update tracing.
+ZygoteHooksCC -> RuntimeCC : DidForkFromZygote(...)
+deactivate ZygoteHooksCC
+
+activate RuntimeCC
+RuntimeCC -> RuntimeCC : reinit native bridges
+RuntimeCC -> RuntimeCC : CreateThreadPool();
+RuntimeCC -> RuntimeCC : ResetGcPerformanceInfo();
+RuntimeCC -> RuntimeCC : StartSignalCatcher();
+RuntimeCC -> RuntimeCC : Dbg::StartJdwp();
+RuntimeCC -> ZygoteHooksCC : return
+deactivate RuntimeCC
+
+activate ZygoteHooksCC
+ZygoteHooksCC -> ZygoteHooks : return
+deactivate ZygoteHooksCC
+
+activate ZygoteHooks
+ZygoteHooks -> ZygoteHooks : Math.setRandomSeedInternal\n(System.currentTimeMillis());
+end
+
+ZygoteHooks -> Zygote : return
+deactivate ZygoteHooks
+
+activate Zygote
+Zygote -> ZygoteInit : return pid
+deactivate Zygote
+
+activate ZygoteInit
+deactivate ZygoteInit
+@enduml
