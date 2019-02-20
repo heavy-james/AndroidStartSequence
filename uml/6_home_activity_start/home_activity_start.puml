@@ -1,0 +1,117 @@
+@startuml
+participant ActivityManagerService as "ActivityManagerService.java"
+participant ActivityStackSupervisor as "ActivityStackSupervisor.java"
+participant ActivityStack as "ActivityStack.java"
+
+--> ActivityManagerService : startHomeActivityLocked
+ref over ActivityManagerService : system_server_start.puml
+
+
+activate ActivityManagerService
+ActivityManagerService -> ActivityManagerService : getHomeIntent();
+ActivityManagerService -> ActivityManagerService : ActivityInfo aInfo = resolveActivityInfo\
+\n(intent, STOCK_PM_FLAGS, userId);
+
+alt aInfo
+else not null
+ActivityManagerService -> ActivityManagerService : ProcessRecord app = getProcessRecordLocked\
+\n(aInfo.processName,naInfo.applicationInfo.uid, true);\
+\n//get and check cached ProcessRecord\
+\n//if process pss oversize, then kill it
+
+ActivityManagerService -> ActivityStackSupervisor : startHomeActivity(intent, aInfo, reason);
+
+deactivate ActivityManagerService
+activate ActivityStackSupervisor
+end
+
+
+
+
+activate ActivityStackSupervisor
+ActivityStackSupervisor -> ActivityStackSupervisor : moveHomeStackTaskToTop\n(HOME_ACTIVITY_TYPE, reason)\
+
+ActivityStackSupervisor -> ActivityStackSupervisor : startActivityLocked(...)
+
+ActivityStackSupervisor -> ActivityStackSupervisor : int err = ActivityManager.START_SUCCESS;\
+\n//initialize return code as START_SUCCECSS
+
+ActivityStackSupervisor -> ActivityStackSupervisor : find callerApp with IApplicationThread\
+\nand set it's uid&pid to target process
+
+ActivityStackSupervisor -> ActivityStackSupervisor : find userId with ActivityInfo
+
+ActivityStackSupervisor -> ActivityStackSupervisor : init resultRecord with resultTo IBinder
+
+ActivityStackSupervisor -> ActivityStackSupervisor : clear the previous resultRecord\
+\n which for the same caller\
+\n but different request code
+
+ActivityStackSupervisor -> ActivityStackSupervisor : check args and convert error code
+
+ActivityStackSupervisor -> ActivityStackSupervisor : check code\
+\nif not equals START_SUCCESS, return
+
+ActivityStackSupervisor -> ActivityStackSupervisor : check start permission\
+\nif not granted, abort
+
+ref over ActivityStackSupervisor : check_permission.puml
+
+ActivityStackSupervisor -> ActivityStackSupervisor : doPendingActivityLaunchesLocked(false)\
+\n//wait previous activities launching without resume
+
+ActivityStackSupervisor -> ActivityStackSupervisor : startActivityUncheckedLocked(...)\
+\n//this method implement activity stack maintenance\
+\n//and finally call resumeTopActivitiesLocked()
+
+ActivityStackSupervisor -> ActivityStackSupervisor : resumeTopActivitiesLocked()
+
+ActivityStackSupervisor -> ActivityStack : resumeTopActivityLocked(null)
+
+deactivate ActivityStackSupervisor
+
+activate ActivityStack
+
+ActivityStack -> ActivityStack : resumeTopActivityInnerLocked(prev, options)
+
+ActivityStack -> ActivityStack : ActivityRecord next = topRunningActivityLocked(null)
+
+ActivityStack -> ActivityStack : do a lot check and config
+
+ActivityStack -> ActivityStackSupervisor : startSpecificActivityLocked(next, true, true);
+deactivate ActivityStack
+
+activate ActivityStackSupervisor
+ActivityStackSupervisor -> ActivityStackSupervisor : ProcessRecord app = mService.getProcessRecordLocked\
+\n(r.processName, r.info.applicationInfo.uid, true);\
+\n//find process cache
+
+alt app
+else not null
+   ActivityStackSupervisor -> ActivityStackSupervisor : realStartActivityLocked()\
+   //todo: expand this logic
+end
+
+ActivityStackSupervisor -> ActivityManagerService : startProcessLocked(...)
+deactivate ActivityStackSupervisor
+
+
+activate ActivityManagerService
+ActivityManagerService -> Process : start(...)
+deactivate ActivityManagerService
+
+
+activate Process
+Process -> Process : startViaZygote(...)
+Process -> Process : translate args for zygote
+Process ->  : zygoteSendArgsAndGetResult\n(openZygoteSocketIfNeeded(abi), argsForZygote);\
+\n send command via socket to zygote to start the app
+ref over Process : app_start_wrapper.puml
+
+deactivate Process
+
+
+
+
+deactivate ActivityStackSupervisor
+@enduml

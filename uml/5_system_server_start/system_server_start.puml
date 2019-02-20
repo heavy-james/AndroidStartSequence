@@ -119,17 +119,9 @@ group handleSystemServerProcess
             activate ActivityManagerService
         end
 
-        ActivityManagerService -> ActivityManagerService : startHomeActivityLocked(mCurrentUserId, "systemReady");
-        ActivityManagerService -> ActivityStackSupervisor : startHomeActivity(intent, aInfo, reason);
+        ActivityManagerService ->  : startHomeActivityLocked(mCurrentUserId, "systemReady");
+        ref over ActivityManagerService : home_activity_start.puml
         deactivate ActivityManagerService
-
-
-        activate ActivityStackSupervisor
-        ActivityStackSupervisor -> ActivityStackSupervisor : moveHomeStackTaskToTop(HOME_ACTIVITY_TYPE, reason)
-        ActivityStackSupervisor -> ActivityStackSupervisor : startActivityLocked(...)
-
-        deactivate ActivityStackSupervisor
-
         deactivate RuntimeInit
     end
 end

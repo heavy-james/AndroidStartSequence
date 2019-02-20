@@ -1,0 +1,67 @@
+@startuml
+participant ZygoteInit as "ZygoteInit.java"
+participant LocalServerSocket as "LocalServerSocket.java"
+participant ZygoteConnection as "ZygoteConnection.java"
+participant Zygote as "Zygote.java"
+participant WrapperInit as "WrapperInit.java"
+
+group Zygote Socket Register & Listen
+
+    activate ZygoteInit
+    -> ZygoteInit : registerZygoteSocket("zygote")
+
+    note right of ZygoteInit : register socket to handle command \n when zygote process start
+
+    ZygoteInit -> ZygoteInit : runSelectLoop(String abiList)
+
+    <-- ZygoteInit : resgister complete
+    ref over ZygoteInit : zygote_start.puml
+
+    deactivate ZygoteInit
+
+end
+
+
+group App Start
+
+
+    -> ZygoteInit : zygoteSendArgsAndGetResult(...)\
+    \n//launch home or normal app
+
+    ref over ZygoteInit : home_activity_start.puml
+
+    activate ZygoteInit
+    ZygoteInit -> ZygoteInit : received by runSelectLoop
+    ZygoteInit -> ZygoteConnection : runOnce()
+    deactivate ZygoteInit
+
+    activate ZygoteConnection
+    ZygoteConnection -> Zygote : forkAndSpecialize(...)
+    deactivate ZygoteConnection
+
+    activate Zygote
+    Zygote --> ZygoteConnection : return pid
+    deactivate Zygote
+
+    activate ZygoteConnection
+    ZygoteConnection -> ZygoteConnection : handleChildProc(...)
+
+    ZygoteConnection -> WrapperInit : execApplication(...)\
+
+    deactivate ZygoteConnection
+
+    activate WrapperInit
+    WrapperInit -> Zygote : execShell(command.toString)\
+    \n// wrapper args to string\
+    \n//call /system/bin/app_process64 with arg string\
+    \n//this is zygote service!
+    deactivate WrapperInit
+
+    activate Zygote
+    <- Zygote : execute command, start from app_main.cpp :: main()
+    deactivate Zygote
+
+    ref over Zygote : zygote_start.puml
+
+end
+@enduml

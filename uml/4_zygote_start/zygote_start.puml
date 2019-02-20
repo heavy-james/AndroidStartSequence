@@ -7,7 +7,7 @@ participant ZygoteInit as "ZygoteInit.java"
 participant RuntimeInit as "RuntimeInit.java"
 participant SamplingProfilerIntegration as "SamplingProfilerIntegration.java"
 
-ref over AppMain : 1_class_start_main.puml
+ref over AppMain : class_start_main.puml
 
 -> AppMain : class_start main
 
@@ -91,7 +91,7 @@ deactivate AppRuntime
 
 activate AndroidRuntime
 AndroidRuntime -> AndroidRuntime : startReg(env)
-ref over AndroidRuntime : framework_native_register.puml
+ref over AndroidRuntime : register_framework_native_method.puml
 AndroidRuntime -> AndroidRuntime : jni init class&args&method to start
 AndroidRuntime -> ZygoteInit : call static method main with args
 deactivate AndroidRuntime
@@ -117,7 +117,10 @@ activate ZygoteInit
 ZygoteInit -> ZygoteInit : init args
 note right of ZygoteInit : args include: \nstartSystemServer \nsocketName \nabiList
 
-ZygoteInit -> ZygoteInit : registerZygoteSocket(socketName):
+ZygoteInit -> ZygoteInit : registerZygoteSocket(socketName)\
+\n//this socket will handle app start commands
+
+ref over ZygoteInit: app_start.puml
 
 ZygoteInit -> ZygoteInit : preload() //load framework classes&resources&libs
 ZygoteInit -> SamplingProfilerIntegration : writeZygoteSnapshot();
@@ -134,10 +137,18 @@ alt startSystemServer
 else yes
 ZygoteInit -> ZygoteInit : startSystemServer(abiList, socketName);
 
-ref over ZygoteInit : 3_system_server_start.puml
+ref over ZygoteInit : start_system_server.puml
 end
 
 ZygoteInit -> ZygoteInit : runSelectLoop(abiList);  loop handle zygote connection
+
+group runSelectLoop
+    loop true
+        ZygoteInit -> ZygoteInit : ZygoteConnection newPeer = acceptCommandPeer(abiList);
+        ZygoteInit -> ZygoteInit : peers.get(i).runOnce();
+    end
+end
+
 
 ZygoteInit -> ZygoteInit : closeServerSocket();
 
