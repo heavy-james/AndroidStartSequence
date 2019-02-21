@@ -9,14 +9,19 @@ participant SamplingProfilerIntegration as "SamplingProfilerIntegration.java"
 
 ref over AppMain : class_start_main.puml
 
--> AppMain : class_start main
+-> AppMain : class_start main call\
+ \nmain(int argc, char* const argv[])
+
+note right of AppMain : case zygote start, argv = \
+\n -Xzygote /system/bin --zygote --start-system-server\
+\ncase app start, agv = need-find-out~
 
 activate AppMain
 AppMain -> AppRuntime : create AppRuntime instance
 deactivate AppMain
 
 activate AppRuntime
-AppRuntime -> AppMain : constructor return
+AppRuntime --> AppMain : constructor return
 deactivate AppRuntime
 
 activate AppMain
@@ -29,20 +34,25 @@ note right of AppMain : args include : \nzygote(--zygote)\
 
 alt className
 
+note right of AppMain : case zygote init className = null \
+\ncase app start className = android.app.ActivityThread\
+
 else Not Empty
 
     alt application
 
-    else yes
-        AppMain -> AppMain : add arg tool
+    note right of AppMain : todo// describe application value
+
     else no
-        AppMain -> AppMain : add arg application
+        AppMain -> AppMain : add arg tool
+    else yes
+        AppMain -> AppMain : add arg application, will be used in RuntimeInit.main()
     end
     AppMain -> AppRuntime : setClassNameAndArgs
     deactivate AppMain
 
     activate AppRuntime
-    AppRuntime -> AppMain : method return
+    AppRuntime --> AppMain : method return
     deactivate AppRuntime
     activate AppMain
 
@@ -77,82 +87,47 @@ else no & className empty
 end
 
 
-AndroidRuntime --> AndroidRuntime : start(className, args, zygote)
+AppMain -> AndroidRuntime : if called start(className, args, zygote)
 activate AndroidRuntime
-AndroidRuntime -> AndroidRuntime : log boot start
-AndroidRuntime -> AndroidRuntime : rootDir = getenv("ANDROID_ROOT") or /system
+AndroidRuntime -> AndroidRuntime : setEnv ANDROID_ROOT to "/system"
 AndroidRuntime -> AndroidRuntime : startVm(&mJavaVM, &env, zygote)
 AndroidRuntime -> AppRuntime : onVmCreated(env);
 deactivate AndroidRuntime
 
 activate AppRuntime
-AppRuntime -> AndroidRuntime : method return
+AppRuntime --> AndroidRuntime : method return
 deactivate AppRuntime
 
 activate AndroidRuntime
 AndroidRuntime -> AndroidRuntime : startReg(env)
+
 ref over AndroidRuntime : register_framework_native_method.puml
-AndroidRuntime -> AndroidRuntime : jni init class&args&method to start
+AndroidRuntime -> AndroidRuntime : init jni call for static method main\
+\n, by given className and args.
+
 AndroidRuntime -> ZygoteInit : call static method main with args
 deactivate AndroidRuntime
 
-activate ZygoteInit
-ZygoteInit -> RuntimeInit : enableDdms();
-deactivate ZygoteInit
-
-activate RuntimeInit
-RuntimeInit -> ZygoteInit : return
-deactivate RuntimeInit
-
-activate ZygoteInit
-ZygoteInit -> SamplingProfilerIntegration : start()
-deactivate ZygoteInit
-
-activate SamplingProfilerIntegration
-SamplingProfilerIntegration -> ZygoteInit : return
-deactivate SamplingProfilerIntegration
+alt className
 
 
 activate ZygoteInit
-ZygoteInit -> ZygoteInit : init args
-note right of ZygoteInit : args include: \nstartSystemServer \nsocketName \nabiList
 
-ZygoteInit -> ZygoteInit : registerZygoteSocket(socketName)\
-\n//this socket will handle app start commands
+note right of AndroidRuntime : className passed by app_main.cpp:main()\
+\nfrom init.rc execution, or app start parent process,\
+\nif from app start action, we are in child process here)
 
-ref over ZygoteInit: app_start.puml
+else ZygoteInit
 
-ZygoteInit -> ZygoteInit : preload() //load framework classes&resources&libs
-ZygoteInit -> SamplingProfilerIntegration : writeZygoteSnapshot();
-deactivate ZygoteInit
+ref over ZygoteInit : zygote_init.puml
 
-activate SamplingProfilerIntegration
-SamplingProfilerIntegration -> ZygoteInit : return
-deactivate SamplingProfilerIntegration
+else RuntimeInit
 
-activate ZygoteInit
-ZygoteInit -> ZygoteInit : gcAndFinalize();
+ref over ZygoteInit : runtime_init.puml
 
-alt startSystemServer
-else yes
-ZygoteInit -> ZygoteInit : startSystemServer(abiList, socketName);
-
-ref over ZygoteInit : start_system_server.puml
-end
-
-ZygoteInit -> ZygoteInit : runSelectLoop(abiList);  loop handle zygote connection
-
-group runSelectLoop
-    loop true
-        ZygoteInit -> ZygoteInit : ZygoteConnection newPeer = acceptCommandPeer(abiList);
-        ZygoteInit -> ZygoteInit : peers.get(i).runOnce();
-    end
 end
 
 
-ZygoteInit -> ZygoteInit : closeServerSocket();
-
-deactivate AppMain
 deactivate AndroidRuntime
 
 @enduml

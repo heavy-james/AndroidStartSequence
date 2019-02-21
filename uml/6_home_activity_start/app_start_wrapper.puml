@@ -4,15 +4,16 @@ participant LocalServerSocket as "LocalServerSocket.java"
 participant ZygoteConnection as "ZygoteConnection.java"
 participant Zygote as "Zygote.java"
 participant WrapperInit as "WrapperInit.java"
+participant RuntimeInit as "RuntimeInit.java"
 
 group Zygote Socket Register & Listen
 
     activate ZygoteInit
-    -> ZygoteInit : registerZygoteSocket("zygote")
+    -> ZygoteInit : 1. registerZygoteSocket("zygote")
 
     note right of ZygoteInit : register socket to handle command \n when zygote process start
 
-    ZygoteInit -> ZygoteInit : runSelectLoop(String abiList)
+    ZygoteInit -> ZygoteInit : 2. runSelectLoop(String abiList)
 
     <-- ZygoteInit : resgister complete
     ref over ZygoteInit : zygote_start.puml
@@ -25,18 +26,18 @@ end
 group App Start
 
 
-    -> ZygoteInit : zygoteSendArgsAndGetResult(...)\
+    -> ZygoteInit : 1. zygoteSendArgsAndGetResult(...)\
     \n//launch home or normal app
 
     ref over ZygoteInit : home_activity_start.puml
 
     activate ZygoteInit
-    ZygoteInit -> ZygoteInit : received by runSelectLoop
-    ZygoteInit -> ZygoteConnection : runOnce()
+    ZygoteInit --> ZygoteInit : received by runSelectLoop()
+    ZygoteInit -> ZygoteConnection : 2. runOnce()
     deactivate ZygoteInit
 
     activate ZygoteConnection
-    ZygoteConnection -> Zygote : forkAndSpecialize(...)
+    ZygoteConnection -> Zygote : 3.forkAndSpecialize(...)
     deactivate ZygoteConnection
 
     activate Zygote
@@ -44,24 +45,51 @@ group App Start
     deactivate Zygote
 
     activate ZygoteConnection
-    ZygoteConnection -> ZygoteConnection : handleChildProc(...)
+    ZygoteConnection -> ZygoteConnection : 4.applyInvokeWithSystemProperty()
 
-    ZygoteConnection -> WrapperInit : execApplication(...)\
+    note right of ZygoteConnection : init args.inovkeWith by property: "wrap." + args.niceName\
+    \nthis allows specify application executor with property
 
+    ZygoteConnection -> ZygoteConnection : 5. handleChildProc(...)
     deactivate ZygoteConnection
 
-    activate WrapperInit
-    WrapperInit -> Zygote : execShell(command.toString)\
-    \n// wrapper args to string\
-    \n//call /system/bin/app_process64 with arg string\
-    \n//this is zygote service!
-    deactivate WrapperInit
+    alt parsedArgs.invokeWith
 
-    activate Zygote
-    <- Zygote : execute command, start from app_main.cpp :: main()
-    deactivate Zygote
+    note right of ZygoteConnection : invokeWith was initialized in step 4\
 
-    ref over Zygote : zygote_start.puml
+    else null
+
+        note right of ZygoteConnection : we are going to start app from zygote
+        ZygoteConnection -> RuntimeInit : zygoteInit(parsedArgs.targetSdkVersion, parsedArgs.remainingArgs, null)
+
+        activate RuntimeInit
+        RuntimeInit --> RuntimeInit : start app from zygote
+
+        ref over RuntimeInit : runtime_init.puml
+
+        deactivate RuntimeInit
+
+    else not null
+
+        note right of ZygoteConnection : we are going to start app from the beginning
+
+        ZygoteConnection -> WrapperInit : execApplication(...)\
+
+        activate WrapperInit
+        WrapperInit -> Zygote : execShell(command.toString)\
+        \n// wrapper args to string\
+        \n//call /system/bin/app_process64 with arg string
+
+        deactivate WrapperInit
+
+        activate Zygote
+        Zygote --> Zygote : execute command, start from app_main.cpp :: main()
+        deactivate Zygote
+
+        ref over Zygote : zygote_start.puml
+
+    end
+
 
 end
 @enduml

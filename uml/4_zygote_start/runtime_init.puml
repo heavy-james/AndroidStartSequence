@@ -1,0 +1,79 @@
+@startuml
+
+participant RuntimeInit as "RuntimeInit.java"
+participant AndroidRuntime as "AndroidRuntime.cpp"
+participant AppMain as "app_main.cpp"
+participant ZygoteInit as "ZygoteInit.java"
+
+--> RuntimeInit : call zygoteInit(\
+\nparsedArgs.targetSdkVersion,\
+\nparsedArgs.remainingArgs, cl);
+deactivate ZygoteInit
+
+activate RuntimeInit
+RuntimeInit -> RuntimeInit : traceBegin
+RuntimeInit -> RuntimeInit : redirectLogStreams();
+RuntimeInit -> RuntimeInit : commonInit();
+
+note right of RuntimeInit : common init : \
+\nset default handler\
+\nInstall a TimezoneGetter\
+\nReplace java logging with android log\
+\nSets the default HTTP User-Agent\
+\nsocket tagging stats\
+\nenable emulator trace ouput
+
+RuntimeInit -> RuntimeInit : nativeZygoteInit(); //call native method
+
+ref over RuntimeInit : framework_native_register.puml
+
+RuntimeInit --> AndroidRuntime : com_android_internal_os_RuntimeInit_nativeZygoteInit
+deactivate RuntimeInit
+
+activate AndroidRuntime
+AndroidRuntime -> AppMain : onZygoteInit()
+deactivate AndroidRuntime
+
+activate AppMain
+AppMain -> AppMain : proc->startThreadPool();
+note right of AppMain : start thread pool for binder?
+AppMain --> AndroidRuntime : return
+deactivate AppMain
+
+activate AndroidRuntime
+AndroidRuntime --> RuntimeInit : return
+deactivate AndroidRuntime
+
+activate RuntimeInit
+RuntimeInit -> RuntimeInit : applicationInit(targetSdkVersion, argv, classLoader);
+
+
+RuntimeInit -> RuntimeInit : nativeSetExitWithoutCleanup(true);
+RuntimeInit -> RuntimeInit : setTargetHeapUtilization(0.75)
+RuntimeInit -> RuntimeInit : setTargetSdkVersion(targetSdkVersion)
+RuntimeInit -> ZygoteInit : invokeStaticMain(args.startClass, args.startArgs, classLoader);\
+\n//args.startClass == com.android.server.SystemServer\
+\nthrows new ZygoteInit.MethodAndArgsCaller(m, argv))
+deactivate RuntimeInit
+activate ZygoteInit
+
+ZygoteInit -> ZygoteInit : method main() catch MethodAndArgsCaller
+ZygoteInit ->  : caller.run(); reflection call static main()
+
+note right of ZygoteInit : runtime initialization finished,\
+\ndo specified start now\
+
+
+note right of ZygoteInit : case system server start:\
+\n args.startClass = com.android.server.SystemServer
+
+ref over ZygoteInit : system_server_init.puml
+
+note right of ZygoteInit : case app start:\
+\n args.startClass = android.app.ActivityThread
+
+ref over ZygoteInit : app_start.puml
+
+deactivate ZygoteInit
+
+@enduml

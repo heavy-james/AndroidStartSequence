@@ -3,11 +3,7 @@ participant ZygoteInit as "ZygoteInit.java"
 participant Zygote as "Zygote.java"
 participant WrapperInit as "WrapperInit.java"
 participant RuntimeInit as "RuntimeInit.java"
-participant AndroidRuntime as "AndroidRuntime.cpp"
-participant AppMain as "app_main.cpp"
-participant SystemServer as "SystemServer.java"
-participant ActivityManagerService as "ActivityManagerService.java"
-participant ActivityStackSupervisor as "ActivityStackSupervisor.java"
+
 
 --> ZygoteInit : startSystemServer\n(abiList, socketName)
 activate ZygoteInit
@@ -32,97 +28,53 @@ group handleSystemServerProcess
     ZygoteInit -> ZygoteInit : set nice name
     ZygoteInit -> ZygoteInit : init systemServerClasspath
     ZygoteInit -> ZygoteInit : performSystemServerDexOpt()
+    deactivate ZygoteInit
 
     alt parsedArgs.invokeWith
-    else Not Null // run App
-        ZygoteInit -> WrapperInit : execApplication(parsedArgs.invokeWith,\
-        \n            parsedArgs.niceName, parsedArgs.targetSdkVersion,\
-        \n            VMRuntime.getCurrentInstructionSet(), null, args);
 
-    else Null //start system server
+    note right of ZygoteInit : parsedArgs.invokeWith specifies different application runner
+
+    ref over ZygoteInit : app_start_wrapper.puml
+
+    else Not Null
+
+        note right of ZygoteInit : run system server with new wrapper from beginning
+        ZygoteInit -> WrapperInit : execApplication(...);
+
+        activate WrapperInit
+        WrapperInit -> Zygote : execShell(command.toString)\
+        \n// wrapper args to string\
+        \n//execute /system/bin/app_process64
+        deactivate WrapperInit
+
+        activate Zygote
+        Zygote --> Zygote : execute command\
+         \nstart from app_main.cpp :: main()
+
+        ref over Zygote : zygote_start.puml
+        deactivate Zygote
+
+    else Null
+
+        note right of ZygoteInit : run system server with zygote
+
+
+        activate ZygoteInit
+        ZygoteInit -> ZygoteInit : ClassLoader cl = \
+        \nnew PathClassLoader(systemServerClasspath,\
+        \nClassLoader.getSystemClassLoader());
+
+        ZygoteInit -> ZygoteInit : Thread.currentThread().setContextClassLoader(cl)
+
         ZygoteInit -> RuntimeInit : zygoteInit(parsedArgs.targetSdkVersion, parsedArgs.remainingArgs, cl);
         deactivate ZygoteInit
 
         activate RuntimeInit
-        RuntimeInit -> RuntimeInit : traceBegin
-        RuntimeInit -> RuntimeInit : redirectLogStreams();
-        RuntimeInit -> RuntimeInit : commonInit();
+        RuntimeInit --> RuntimeInit : start system server from zygote
 
-        note right of RuntimeInit : common init : \
-        \nset default handler\
-        \nInstall a TimezoneGetter\
-        \nReplace java logging with android log\
-        \nSets the default HTTP User-Agent\
-        \nsocket tagging stats\
-        \nenable emulator trace ouput
-
-        RuntimeInit -> RuntimeInit : nativeZygoteInit(); //call native method
-
-        ref over RuntimeInit : framework_native_register.puml
-
-        RuntimeInit --> AndroidRuntime : com_android_internal_os_RuntimeInit_nativeZygoteInit
+        ref over RuntimeInit : runtime_init.puml
         deactivate RuntimeInit
 
-        activate AndroidRuntime
-        AndroidRuntime -> AppMain : onZygoteInit()
-        deactivate AndroidRuntime
-
-        activate AppMain
-        AppMain -> AppMain : proc->startThreadPool();
-        note right of AppMain : start thread pool for binder?
-        AppMain -> AndroidRuntime : return
-        deactivate AppMain
-
-        activate AndroidRuntime
-        AndroidRuntime -> RuntimeInit : return
-        deactivate AndroidRuntime
-
-        activate RuntimeInit
-        RuntimeInit -> RuntimeInit : applicationInit(targetSdkVersion, argv, classLoader);
-
-        group applicationInit
-            RuntimeInit -> RuntimeInit : nativeSetExitWithoutCleanup(true);
-            RuntimeInit -> RuntimeInit : setTargetHeapUtilization(0.75)
-            RuntimeInit -> RuntimeInit : setTargetSdkVersion(targetSdkVersion)
-            RuntimeInit -> ZygoteInit : invokeStaticMain(args.startClass, args.startArgs, classLoader);\
-            \n//args.startClass == com.android.server.SystemServer\
-            \nthrows new ZygoteInit.MethodAndArgsCaller(m, argv))
-            deactivate RuntimeInit
-            activate ZygoteInit
-        end
-
-        ZygoteInit -> ZygoteInit : method main() catch MethodAndArgsCaller
-        ZygoteInit -> SystemServer : caller.run(); reflection call static main()
-        deactivate ZygoteInit
-
-        activate SystemServer
-        SystemServer -> SystemServer : new SystemServer().run();
-
-        group SystemServer.run()
-            SystemServer -> SystemServer : trigger EventLog, SamplingProfilerIntegration
-            SystemServer -> SystemServer : reset HeapUtilization to 0.8f
-            SystemServer -> SystemServer : Build.ensureFingerprintProperty();
-            SystemServer -> SystemServer : Environment.setUserRequired(true);
-            SystemServer -> SystemServer : BinderInternal.disableBackgroundScheduling(true);\
-            \n//Ensure binder calls into the system always run at foreground priority.
-            SystemServer -> SystemServer : Looper.prepareMainLooper();
-            SystemServer -> SystemServer : System.loadLibrary("android_servers");
-            SystemServer -> SystemServer : mSystemServiceManager = new SystemServiceManager(mSystemContext);
-            SystemServer -> SystemServer : LocalServices.addService(SystemServiceManager.class, mSystemServiceManager)
-            note over SystemServer : start all system services now!
-            SystemServer -> SystemServer : startBootstrapServices
-            SystemServer -> SystemServer : startCoreServices
-            SystemServer -> SystemServer : startOtherServices
-            note over SystemServer : start Home Application now.
-            SystemServer -> ActivityManagerService : systemReady()
-            deactivate SystemServer
-            activate ActivityManagerService
-        end
-
-        ActivityManagerService ->  : startHomeActivityLocked(mCurrentUserId, "systemReady");
-        ref over ActivityManagerService : home_activity_start.puml
-        deactivate ActivityManagerService
-        deactivate RuntimeInit
     end
 end
 

@@ -1,0 +1,66 @@
+@startuml
+
+participant ZygoteInit as "ZygoteInit.java"
+participant Zygote as "Zygote.java"
+participant RuntimeInit as "RuntimeInit.java"
+
+
+
+-> ZygoteInit : call static method main with args
+activate ZygoteInit
+ZygoteInit -> RuntimeInit : enableDdms();
+deactivate ZygoteInit
+
+activate RuntimeInit
+RuntimeInit -> ZygoteInit : return
+deactivate RuntimeInit
+
+activate ZygoteInit
+ZygoteInit -> SamplingProfilerIntegration : start()
+deactivate ZygoteInit
+
+activate SamplingProfilerIntegration
+SamplingProfilerIntegration -> ZygoteInit : return
+deactivate SamplingProfilerIntegration
+
+
+activate ZygoteInit
+ZygoteInit -> ZygoteInit : init args
+note right of ZygoteInit : args include: \nstartSystemServer \nsocketName \nabiList
+
+ZygoteInit -> ZygoteInit : registerZygoteSocket(socketName)\
+\n//this socket will handle app start commands
+
+ref over ZygoteInit: app_start.puml
+
+ZygoteInit -> ZygoteInit : preload() //load framework classes&resources&libs
+ZygoteInit -> SamplingProfilerIntegration : writeZygoteSnapshot();
+deactivate ZygoteInit
+
+activate SamplingProfilerIntegration
+SamplingProfilerIntegration --> ZygoteInit : return
+deactivate SamplingProfilerIntegration
+
+activate ZygoteInit
+ZygoteInit -> ZygoteInit : gcAndFinalize();
+
+alt startSystemServer
+else yes
+ZygoteInit -> ZygoteInit : startSystemServer(abiList, socketName);
+
+ref over ZygoteInit : start_system_server.puml
+end
+
+ZygoteInit -> ZygoteInit : runSelectLoop(abiList);  loop handle zygote connection
+
+group runSelectLoop
+    loop true
+        ZygoteInit -> ZygoteInit : ZygoteConnection newPeer = acceptCommandPeer(abiList);
+        ZygoteInit -> ZygoteInit : peers.get(i).runOnce();
+    end
+end
+
+ZygoteInit -> ZygoteInit : closeServerSocket();
+
+deactivate ZygoteInit
+@enduml

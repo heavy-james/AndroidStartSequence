@@ -1,0 +1,35 @@
+@startuml
+participant SystemServer as "SystemServer.java"
+participant ActivityManagerService as "ActivityManagerService.java"
+
+
+-> SystemServer : call main(String[] args)
+activate SystemServer
+SystemServer -> SystemServer : new SystemServer().run();
+
+group SystemServer.run()
+    SystemServer -> SystemServer : trigger EventLog, SamplingProfilerIntegration
+    SystemServer -> SystemServer : reset HeapUtilization to 0.8f
+    SystemServer -> SystemServer : Build.ensureFingerprintProperty();
+    SystemServer -> SystemServer : Environment.setUserRequired(true);
+    SystemServer -> SystemServer : BinderInternal.disableBackgroundScheduling(true);\
+    \n//Ensure binder calls into the system always run at foreground priority.
+    SystemServer -> SystemServer : Looper.prepareMainLooper();
+    SystemServer -> SystemServer : System.loadLibrary("android_servers");
+    SystemServer -> SystemServer : mSystemServiceManager = new SystemServiceManager(mSystemContext);
+    SystemServer -> SystemServer : LocalServices.addService(SystemServiceManager.class, mSystemServiceManager)
+    note over SystemServer : start all system services now!
+    SystemServer -> SystemServer : startBootstrapServices()
+    SystemServer -> SystemServer : startCoreServices()
+    SystemServer -> SystemServer : startOtherServices()
+    note over SystemServer : start Home Application now.
+    SystemServer -> ActivityManagerService : systemReady()
+    deactivate SystemServer
+    activate ActivityManagerService
+end
+
+ActivityManagerService ->  : startHomeActivityLocked(mCurrentUserId, "systemReady");
+ref over ActivityManagerService : home_activity_start.puml
+deactivate ActivityManagerService
+
+@enduml
