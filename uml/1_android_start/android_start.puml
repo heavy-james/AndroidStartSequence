@@ -1,33 +1,82 @@
 @startuml
 
-'participants below
-
 participant "PowerOn"
 
-participant "CpuInternalProgram" as CpuInPg
+participant CpuInPg as "CpuInternalProgram"
 
-participant "BootLoader"
+participant BootLoader as "BootLoader"
 
-participant "Kernel"
+participant Kernel as "Kernel"
 
-participant "InitProcess"
+participant InitProcess as "InitProcess"
 
-participant "Zygote"
+participant Zygote as "Zygote"
 
-participant "SystemServer"
+participant SystemServer as "SystemServer"
 
-participant "Home"
+participant Home as "Home"
 
 'sequence below
 
+activate PowerOn
 PowerOn -> CpuInPg : 上电
 
-CpuInPg -> BootLoader : 根据硬件环境，加载对应位置的BootLoader
+activate CpuInPg
+CpuInPg -> BootLoader : 根据硬件环境，\n加载对应位置的BootLoader
+deactivate CpuInPg
 
-BootLoader -> Kernel : 汇编程序引导，\n调用kernel/init/main.c#start_kernel()加载内核
+activate BootLoader
+BootLoader -> Kernel : 汇编程序引导，调用\nkernel/init/main.c#start_kernel()\n加载内核
+deactivate BootLoader
 
-Kernel -> InitProcess : 调用kernel/init/main.c#rest_init()启动init进程
+activate Kernel
+Kernel -> InitProcess : 调用\kernel/init/main.c\nrest_init()启动init进程
+
+activate InitProcess
+InitProcess -> InitProcess : 启动core服务
+InitProcess -> Zygote : 启动main服务
+deactivate InitProcess
+
+activate Zygote
+Zygote -> Zygote : 初始化AndroidRuntime
+Zygote -> Zygote : 初始化启动虚拟机
+Zygote -> Zygote : 注册框架jni方法
+Zygote -> Zygote : 注册zygote socket\
+\n等待fork请求
+Zygote -> Zygote : 预加载系统资源
+Zygote -> SystemServer : 启动系统服务
+
+activate SystemServer
+Zygote --> InitProcess
+activate InitProcess
+InitProcess -> InitProcess : 启动late-start服务
+deactivate InitProcess
 
 
+SystemServer -> SystemServer : fork出system-server子进程
+SystemServer -> SystemServer : 执行system server的dex优化
+SystemServer -> SystemServer : 根据systemClasspPath\
+\n创建并设置当前线程的ClassLoader
+SystemServer -> SystemServer : 执行通用runtime初始化
+SystemServer -> SystemServer : 加载system_servers静态库
+SystemServer -> SystemServer : 创建SystemServerManager对象
+SystemServer -> SystemServer : startBootstrapServices
+SystemServer -> SystemServer : startCoreServices
+SystemServer -> SystemServer : startOtherServices
+SystemServer -> Home : 调用systemReady\n通知启动Launcher
 
+activate Home
+Home -> Home : 检查进程和Activity记录，调度Activity
+Home -> Home : 通过Process.start启动新进程，\n向Zygote发送start命令
+Home -> Home : Zygote fork出子进程，返回pid
+Home -> Home : 执行通用runtime初始化
+Home -> Home : 创建ActivityThread,运行Application
+Home -> Home : xxx
+Home -> Home : 等待用户操作
+
+deactivate Home
+deactivate SystemServer
+deactivate Zygote
+deactivate Kernel
+deactivate PowerOn
 @enduml
