@@ -1,0 +1,97 @@
+@startuml
+participant ActivityStackSupervisor as "ActivityStackSupervisor.java"
+
+participant ActivityThread as "ActivityThread.java"
+
+-> ActivityStackSupervisor : attachApplicationLocked\
+\n(ProcessRecord app)
+
+
+
+activate ActivityStackSupervisor
+ActivityStackSupervisor -> ActivityStackSupervisor : find top activity record from front stack
+
+ActivityStackSupervisor -> ActivityStackSupervisor : if record's uid, process equals app's, call\
+\nrealStartActivityLocked(record, app, true, true)
+
+group realStartActivityLocked
+
+alt andResume
+else true
+    ActivityStackSupervisor -> ActivityStackSupervisor : notify WindowManager visible this app
+end
+
+alt checkConfig
+else true
+    ActivityStackSupervisor -> ActivityStackSupervisor : notify WindowManager, ActivityManagerService to update config
+end
+
+ActivityStackSupervisor -> ActivityStackSupervisor : r.app = app;//set app to activity record
+
+ActivityStackSupervisor -> ActivityStackSupervisor : app.activities.add(r);// add record to app if need.
+
+ActivityStackSupervisor -> ActivityStackSupervisor : mService.updateLruProcessLocked(app, true, null);
+
+ActivityStackSupervisor -> ActivityStackSupervisor : mService.updateOomAdjLocked();
+
+ActivityStackSupervisor -> ActivityThread : scheduleLaunchActivity(...)
+
+deactivate ActivityStackSupervisor
+activate ActivityThread
+
+ActivityThread -> ActivityThread: updateProcessState(procState, false);
+
+ActivityThread -> ActivityThread: ActivityClientRecord r = new ActivityClientRecord();
+
+ActivityThread -> ActivityThread: infalte r with args
+
+ActivityThread -> ActivityThread: updatePendingConfiguration(curConfig);
+
+ActivityThread -> ActivityThread: sendMessage(H.LAUNCH_ACTIVITY, r);
+
+ActivityThread -> ActivityThread: messasge handler call handleLaunchActivity\
+\n(ActivityClientRecord r, Intent customIntent)
+
+group handleLaunchActivity
+
+    ActivityThread -> ActivityThread: WindowManagerGlobal.initialize();
+
+    ActivityThread -> ActivityThread: Activity a = performLaunchActivity(r, customIntent);
+
+    ref over ActivityThread : perform_launch_activity.puml
+
+    alt a
+    else Not null
+        ActivityThread -> ActivityThread: handleResumeActivity(r.token, false, r.isForward,\
+        \n!r.activity.mFinished && !r.startsNotResumed);
+
+        ref over ActivityThread : handle_resume_activity.puml
+    end
+
+
+    ActivityThread -> ActivityThread:
+
+    ActivityThread -> ActivityThread:
+
+    ActivityThread -> ActivityThread:
+
+    ActivityThread -> ActivityThread:
+
+    ActivityThread -> ActivityThread:
+
+end
+
+
+ActivityStackSupervisor -> ActivityStackSupervisor :
+
+ActivityStackSupervisor -> ActivityStackSupervisor :
+
+ActivityStackSupervisor -> ActivityStackSupervisor :
+
+ActivityStackSupervisor -> ActivityStackSupervisor :
+
+ActivityStackSupervisor -> ActivityStackSupervisor :
+
+deactivate ActivityStackSupervisor
+
+@enduml

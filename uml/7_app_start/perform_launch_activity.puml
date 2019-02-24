@@ -1,0 +1,194 @@
+@startuml
+participant ActivityThread as "ActivityThread.java"
+participant Instrumentation as "Instrumentation.java"
+participant Activity as "Activity.java"
+
+-> ActivityThread : performLaunchActivity\
+\n(ActivityClientRecord r, Intent customIntent)
+
+activate ActivityThread
+
+group performLaunchActivity
+
+    ActivityThread -> ActivityThread : cl = r.packageInfo.getClassLoader();
+
+    ActivityThread -> Instrumentation : activity = mInstrumentation.newActivity\
+    \n(cl, component.getClassName(), r.intent);
+
+    deactivate ActivityThread
+    activate Instrumentation
+
+    Instrumentation -> Instrumentation : cl.loadClass(className).newInstance();
+    Instrumentation --> ActivityThread : return activity
+
+    deactivate Instrumentation
+    activate ActivityThread
+
+    alt exception occurs
+    else yes
+    <-- ActivityThread : throw new RuntimeException\
+    \n(Unable to instantiate activity " + component)
+    end
+
+    ActivityThread -> ActivityThread : Application app = r.packageInfo.\
+    \n makeApplication(false, mInstrumentation);
+
+    note right of ActivityThread : normally, the application has been created before, and\
+    \n will return mApplication filed in ActivityThread directly
+
+    ref over ActivityThread : make_application.puml
+
+    alt activity
+    else Not Null
+        ActivityThread -> ActivityThread : Context appContext = \
+        \ncreateBaseContextForActivity(r, activity);\
+        \n//create activity context
+
+        ActivityThread -> ActivityThread : CharSequence title = \
+        \nr.activityInfo.loadLabel(appContext.getPackageManager());
+
+        ActivityThread -> ActivityThread : Configuration config = \
+        \n new Configuration(mCompatConfiguration);
+
+        ActivityThread -> Activity : activity.attach(...);
+
+        deactivate ActivityThread
+        activate Activity
+
+        Activity -> Activity : attachBaseContext(context);
+
+        Activity -> Activity : mFragments.attachHost(null /*parent*/);
+
+        Activity -> Activity : mWindow = new PhoneWindow(this);
+
+        Activity -> Activity : init mWindow
+
+        Activity -> Activity : init other member
+        
+        note right of Activity :  mUiThread = Thread.currentThread();\
+        \nmMainThread = aThread;\
+        \nmInstrumentation = instr;\
+        \nmToken = token;\
+        \nmIdent = ident;\
+        \nmApplication = application;\
+        \nmIntent = intent;\
+        \nmReferrer = referrer;\
+        \nmComponent = intent.getComponent();\
+        \nmActivityInfo = info;\
+        \nmTitle = title;\
+        \nmParent = parent;\
+        \nmEmbeddedID = id;\
+        \nmLastNonConfigurationInstances = \
+        \nlastNonConfigurationInstances;
+
+        Activity -> Activity : mVoiceInteractor = new VoiceInteractor(\
+        \nvoiceInteractor, this, this, Looper.myLooper());
+
+        Activity -> Activity : mWindow.setWindowManager(...)\
+        \n//get window manager instance from binder\
+        \n set to mWindow
+
+        alt parent
+        else Not Null
+            Activity -> Activity : mWindow.setContainer(mParent.getWindow());\
+            \n//attach mWindow to parent window
+        end
+
+        Activity -> Activity : mWindowManager = mWindow.getWindowManager();
+        Activity -> Activity : mCurrentConfig = config;
+        Activity --> ActivityThread : attach finished
+
+        deactivate Activity
+        activate ActivityThread
+
+        alt customIntent //argument
+        else Not Null
+            ActivityThread -> ActivityThread : activity.mIntent = customIntent;\
+            \n pass intent to activity
+        end
+
+        ActivityThread -> ActivityThread : int theme = r.activityInfo.getThemeResource();
+
+        alt theme
+        else > 0
+            ActivityThread -> ActivityThread : activity.setTheme(theme);\
+            \n init theme for activity
+        end
+
+        ActivityThread -> Instrumentation : mInstrumentation.callActivityOnCreate\
+        \n(activity, r.state);
+
+        activate Instrumentation
+        deactivate ActivityThread
+
+        ref over Instrumentation : activity_on_create.puml
+
+        Instrumentation -> ActivityThread : callActivityOnCreate finished
+
+        deactivate Instrumentation
+        activate ActivityThread
+
+        ActivityThread -> ActivityThread : r.activity = activity;
+
+        alt r.activity.isFinished
+        else No
+
+            ActivityThread -> Activity : activity.performStart();
+            deactivate ActivityThread
+            activate Activity
+
+            ref over Activity : activity_on_start.puml
+            Activity --> ActivityThread : performStart finished
+
+            deactivate Activity
+            activate ActivityThread
+
+            ActivityThread -> Instrumentation : callActivityOnRestoreInstanceState(activity, r.state);\
+            \n//persistentState alternatively available here
+
+            deactivate ActivityThread
+            activate Instrumentation
+
+            ref over Instrumentation : activity_on_restore_instance_state.puml
+
+            Instrumentation -> ActivityThread : callActivityOnRestoreInstanceState finished
+
+            deactivate Instrumentation
+            activate ActivityThread
+
+            ActivityThread ->  Instrumentation :  callActivityOnPostCreate(activity, r.state);
+
+            deactivate ActivityThread
+            activate Instrumentation
+
+            ref over Instrumentation : activity_on_post_create.puml
+
+            Instrumentation --> ActivityThread : callActivityOnPostCreate finished
+
+            deactivate Instrumentation
+            activate ActivityThread
+
+        end
+
+        alt catch SuperNotCalledException e
+        else caught
+            ActivityThread -> ActivityThread : throw e;
+        end
+
+        alt catch Exception e
+        else caught
+            ActivityThread -> ActivityThread : throw new RuntimeException\
+            \n(Unable to start activity " + ...)
+        end
+
+        ActivityThread -> ActivityThread : r.paused = true;
+
+        ActivityThread -> ActivityThread : mActivities.put(r.token, r);
+    end
+end
+
+<-- ActivityThread : return activity
+
+deactivate ActivityThread
+
+@enduml

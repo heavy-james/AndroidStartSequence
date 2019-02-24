@@ -118,7 +118,7 @@ ActivityManagerService -> ActivityManagerService : mStackSupervisor.attachApplic
 \n//set badApp true, if exception occurs,\
 \n//set didSomething true, if found activity
 
-ref over ActivityManagerService : attach_application.puml
+ref over ActivityManagerService : activity_supervisor_attach_application.puml
 
 alt badApp
 else false

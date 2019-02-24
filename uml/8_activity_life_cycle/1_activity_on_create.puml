@@ -1,0 +1,63 @@
+@startuml
+participant ActivityThread as "ActivityThread.java"
+participant Instrumentation as "Instrumentation.java"
+participant Activity as "Activity.java"
+
+-> ActivityThread : performLaunchActivity(...)
+
+ActivityThread -> ActivityThread : activity instantiate ...
+
+ActivityThread -> Instrumentation : mInstrumentation.callActivityOnCreate\
+\n(activity, r.state);
+
+note right of ActivityThread : if r.isPersistable() is true,\
+ \n here will call onCreate with r.persistentState arg
+
+deactivate ActivityThread
+activate Instrumentation
+
+Instrumentation -> Activity : prePerformCreate(activity);
+
+Instrumentation -> Instrumentation : activity.performCreate(icicle);
+
+deactivate Instrumentation
+activate Activity
+
+Activity -> Activity : restoreHasCurrentPermissionRequest(icicle);
+
+Activity -> Activity : onCreate(icicle);\
+\n dispatch onCreate now!
+
+Activity -> Activity : mActivityTransitionState.readState(icicle);
+
+Activity -> Activity : performCreateCommon();
+
+group performCreateCommon()
+
+Activity -> Activity : set mVisibleFromClient
+
+Activity -> Activity : mFragments.dispatchActivityCreated();
+
+Activity -> Activity : mActivityTransitionState.\
+\n setEnterActivityOptions(this, getActivityOptions());
+end
+
+Activity --> Instrumentation : performCreate finished
+
+deactivate Activity
+activate Instrumentation
+
+Instrumentation -> Instrumentation : postPerformCreate(activity);
+
+Instrumentation --> ActivityThread : callActivityOnCreate finished
+
+activate ActivityThread
+
+alt activity.mCalled
+else false
+ActivityThread -> ActivityThread : throw new RuntimeException\
+\n(... + "did not call through to super.onCreate()")
+deactivate ActivityThread
+end
+
+@enduml

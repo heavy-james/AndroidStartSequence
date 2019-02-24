@@ -1,0 +1,7 @@
+@startuml
+participant ActivityThread as "ActivityThread.java"
+participant Instrumentation as "Instrumentation.java"
+participant Activity as "Activity.java"
+
+
+@enduml

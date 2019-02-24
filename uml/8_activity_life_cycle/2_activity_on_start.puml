@@ -1,0 +1,46 @@
+@startuml
+participant ActivityThread as "ActivityThread.java"
+participant Activity as "Activity.java"
+participant Instrumentation as "Instrumentation.java"
+
+ActivityThread -> Activity : activity.performStart();
+
+deactivate ActivityThread
+activate Activity
+
+Activity -> Activity : mActivityTransitionState.setEnterActivityOptions\
+\n(this, getActivityOptions());
+
+Activity -> Activity : mFragments.noteStateNotSaved();
+
+Activity -> Activity : mCalled = false;
+
+Activity -> Activity : mFragments.execPendingActions();
+
+Activity -> Instrumentation : mInstrumentation.callActivityOnStart(this);
+
+deactivate Activity
+activate Instrumentation
+
+Instrumentation -> Activity : onStart();
+
+deactivate Instrumentation
+activate Activity
+
+Activity --> Instrumentation : onStart return
+
+deactivate Activity
+activate Instrumentation
+
+Instrumentation --> Activity : callActivityOnStart return
+
+deactivate Instrumentation
+activate Activity
+
+Activity -> Activity : mFragments.dispatchStart();
+Activity -> Activity : mFragments.reportLoaderStart();
+Activity -> Activity : mActivityTransitionState.enterReady(this);
+Activity --> ActivityThread : performStart() finished
+deactivate Activity
+activate ActivityThread
+@enduml

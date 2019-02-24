@@ -1,0 +1,32 @@
+@startuml
+participant ActivityThread as "ActivityThread.java"
+participant Instrumentation as "Instrumentation.java"
+participant Activity as "Activity.java"
+
+ActivityThread ->  Instrumentation :  callActivityOnPostCreate(activity, r.state);
+
+deactivate ActivityThread
+activate Instrumentation
+
+Instrumentation -> Activity : activity.onPostCreate(icicle);
+
+deactivate Instrumentation
+activate Activity
+
+alt isChild()
+else No
+Activity -> Activity : mTitleReady = true;
+Activity -> Activity : onTitleChanged(getTitle(), getTitleColor());
+end
+
+Activity -> Activity : mCalled = true;
+
+Activity --> Instrumentation : onPostCreate finished
+
+deactivate Activity
+activate Instrumentation
+
+Instrumentation --> ActivityThread : callActivityOnPostCreate finished
+deactivate Instrumentation
+
+@enduml
