@@ -14,7 +14,7 @@ participant Zygote as "Zygote"
 
 participant SystemServer as "SystemServer"
 
-participant Home as "Home"
+participant ActivityManagerService as "ActivityManagerService.java"
 
 'sequence below
 
@@ -63,18 +63,18 @@ SystemServer -> SystemServer : 创建SystemServerManager对象
 SystemServer -> SystemServer : startBootstrapServices
 SystemServer -> SystemServer : startCoreServices
 SystemServer -> SystemServer : startOtherServices
-SystemServer -> Home : 调用systemReady\n通知启动Launcher
+SystemServer -> ActivityManagerService : 调用systemReady\n通知启动Launcher
 
-activate Home
-Home -> Home : 检查进程和Activity记录，调度Activity
-Home -> Home : 通过Process.start启动新进程，\n向Zygote发送start命令
-Home -> Home : Zygote fork出子进程，返回pid
-Home -> Home : 执行通用runtime初始化
-Home -> Home : 创建ActivityThread,运行Application
-Home -> Home : xxx
-Home -> Home : 等待用户操作
+activate ActivityManagerService
+ActivityManagerService -> ActivityManagerService : 检查进程和Activity记录，调度Activity
+ActivityManagerService -> ActivityManagerService : 通过Process.start启动新进程，\n向Zygote发送start命令
+ActivityManagerService -> ActivityManagerService : Zygote fork出子进程，返回pid
+ActivityManagerService -> ActivityManagerService : 执行通用runtime初始化
+ActivityManagerService -> ActivityManagerService : 创建ActivityThread,运行Application
+ActivityManagerService -> ActivityManagerService : xxx
+ActivityManagerService -> ActivityManagerService : 等待用户操作
 
-deactivate Home
+deactivate ActivityManagerService
 deactivate SystemServer
 deactivate Zygote
 deactivate Kernel

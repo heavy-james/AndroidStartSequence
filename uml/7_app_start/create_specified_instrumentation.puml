@@ -1,0 +1,102 @@
+@startuml
+participant ActivityThread as "ActivityThread.java"
+
+participant Instrumentation as "Instrumentation.java"
+
+-> ActivityThread : call handleBindApplication
+
+activate ActivityThread
+
+ref over ActivityThread : app_start.puml
+
+ActivityThread -> ActivityThread : initialize instrumentation for app
+
+ActivityThread -> ActivityThread : create customized instrumentation for app
+
+group Create Customized Instrumentation
+
+    ActivityThread -> ActivityThread : InstrumentationInfo ii = null;\
+    \nii = appContext.getPackageManager().\
+    \n              getInstrumentationInfo(data.instrumentationName, 0);
+
+    note right of ActivityThread : when installing app to the device, the package manager\
+     \nwill collect the instrumentation info registered in Manifest,\
+     \nget the info now!
+
+    alt ii
+    else null
+        <- ActivityThread : throw new RuntimeException\
+        \n("Unable to find instrumentation info for:" + className)
+        deactivate ActivityThread
+    end
+
+    ActivityThread -> ActivityThread : inflate self with InstrumentationInfo
+
+    activate ActivityThread
+    note right of ActivityThread : mInstrumentationPackageName = ii.packageName;\
+     \nmInstrumentationAppDir = ii.sourceDir;\
+     \nmInstrumentationSplitAppDirs = ii.splitSourceDirs;\
+     \nmInstrumentationLibDir = ii.nativeLibraryDir;\
+     \nmInstrumentedAppDir = data.info.getAppDir();\
+     \nmInstrumentedSplitAppDirs = data.info.getSplitAppDirs();\
+     \nmInstrumentedLibDir = data.info.getLibDir();
+
+    ActivityThread -> ActivityThread : ApplicationInfo instrApp = new ApplicationInfo();
+
+    ActivityThread -> ActivityThread : inflate instrApp with InstrumentationInfo
+
+    note right of ActivityThread : instrApp.packageName = ii.packageName;\
+    \ninstrApp.sourceDir = ii.sourceDir;\
+    \ninstrApp.publicSourceDir = ii.publicSourceDir;\
+    \ninstrApp.splitSourceDirs = ii.splitSourceDirs;\
+    \ninstrApp.splitPublicSourceDirs = ii.splitPublicSourceDirs;\
+    \ninstrApp.dataDir = ii.dataDir;\
+    \ninstrApp.nativeLibraryDir = ii.nativeLibraryDir;
+
+    ActivityThread -> ActivityThread : LoadedApk pi = getPackageInfo(instrApp, data.compatInfo,\
+    \nappContext.getClassLoader(), false, true, false);
+
+    ActivityThread -> ActivityThread : ContextImpl instrContext = ContextImpl.createAppContext(this, pi);
+
+    ref over ActivityThread : create_app_context.puml
+
+    ActivityThread -> ActivityThread : load specified instrumentation class
+
+    ActivityThread -> ActivityThread : mInstrumentation = "reflection call newInstance()"
+
+    alt mInstrumentation
+    else null
+        <- ActivityThread : throw new RuntimeException\
+        \n("Unable to instantiate instrumentation :" + className)
+        deactivate ActivityThread
+    end
+
+
+    ActivityThread -> Instrumentation : mInstrumentation.init(this, instrContext, appContext,\
+    \n new ComponentName(ii.packageName, ii.name),\
+    \n data.instrumentationWatcher,\
+    \n data.instrumentationUiAutomationConnection);\
+
+    deactivate ActivityThread
+
+    activate Instrumentation
+
+    Instrumentation -> Instrumentation : inflate self with args
+
+    note right of Instrumentation : mThread = thread;\
+    \nmMessageQueue = mThread.getLooper().myQueue();\
+    \nmInstrContext = instrContext;\
+    \nmAppContext = appContext;\
+    \nmComponent = component;\
+    \nmWatcher = watcher;\
+    \nmUiAutomationConnection = uiAutomationConnection;
+
+    Instrumentation --> ActivityThread : return
+    deactivate Instrumentation
+    activate ActivityThread
+end
+
+<-- ActivityThread : return
+deactivate ActivityThread
+
+@enduml

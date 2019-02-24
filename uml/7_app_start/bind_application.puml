@@ -1,0 +1,118 @@
+@startuml
+participant ActivityThread as "ActivityThread.java"
+participant ActivityManagerService as "ActivityManagerService.java"
+
+
+-> ActivityThread : bindApplication(...)
+
+deactivate ActivityManagerService
+
+activate ActivityThread
+
+
+ActivityThread -> ActivityThread : setCoreSettings(coreSettings);
+
+ActivityThread -> ActivityThread : convert args to AppBindData
+
+ActivityThread -> ActivityThread : handleBindApplication(data)
+
+group handleBindApplication
+
+    ActivityThread -> ActivityThread : Process.setArgV0(data.processName);\
+    \n//set process name to package name
+
+    ActivityThread -> ActivityThread : disable pseristant process's hardware\
+    \n acceleration for low-memory device
+
+    ActivityThread -> ActivityThread : mProfiler.startProfiling();\
+    \n//start profiler if need.
+
+    ActivityThread -> ActivityThread : AsyncTask.setDefaultExecutor\
+    \n (AsyncTask.THREAD_POOL_EXECUTOR);\
+    \n//for MR1 or earlier
+
+    ActivityThread -> ActivityThread : reset TimeZone to system, Locale to arg specified
+
+    ActivityThread -> ActivityThread : apply resource config to ResourceManager
+
+    ActivityThread -> ActivityThread : getPackageInfoNoCheck(data.appInfo, data.compatInfo);\
+    \n//get LoadedApk instance by application info.
+
+    ActivityThread -> ActivityThread : updateDefaultDensity();\
+    \n//apply density config to DisplayMetrics and BitMap
+
+    ActivityThread -> ActivityThread : ContextImpl.createAppContext(this, data.info);\
+    \n//create Application context with LoadedApk instance
+
+    note right of ActivityThread : we just create context here, not application
+
+    ref over ActivityThread : create_app_context.puml
+
+    ActivityThread -> ActivityThread : set "java.io.tmpdir" value to appContext.getCacheDir()
+
+    ActivityThread -> ActivityThread : setupGraphicsSupport(data.info, codeCacheDir);\
+    \n//pass codeCacheDir to HardwareRenderer.setupDiskCache,\
+    \n//RenderScriptCacheDir.setupDiskCache,\
+    \n//if there is only one package for the app.
+
+    ActivityThread -> ActivityThread : set 24H or 12H time format
+
+    ActivityThread -> ActivityThread : turn on/off View.mDebugViewAttributes by\
+    \nSettings.Global.DEBUG_VIEW_ATTRIBUTES
+
+    ActivityThread -> ActivityThread : StrictMode initialization
+
+    alt data.debugMode
+    else Not IApplicationThread.DEBUG_OFF
+
+        ActivityThread -> ActivityThread : Debug.waitForDebugger();
+
+    end
+
+    alt enableOpenGlTrace
+    else true
+        ActivityThread -> ActivityThread : GLUtils.setTracingLevel(1);
+    end
+
+    ActivityThread -> ActivityThread : Trace.setAppTracingAllowed(appTracingAllowed);
+
+    ActivityThread -> ActivityThread : Proxy.setHttpProxySystemProperty(proxyInfo);\
+    \n//enable http proxy to system setting if has
+
+
+    alt data.instrumentationName
+    else Not Null
+        ActivityThread -> ActivityThread : mInstrumentation = "create specified instrumentation"
+
+        ref over ActivityThread : create_specified_instrumentation.puml
+    else Null
+
+        ActivityThread -> ActivityThread : mInstrumentation = new Instrumentation();
+    end
+
+    ActivityThread -> ActivityThread : handle FLAG_LARGE_HEAP specification.
+
+    ActivityThread -> ActivityThread : final StrictMode.ThreadPolicy savedPolicy = StrictMode.allowThreadDiskWrites();
+
+    ActivityThread -> ActivityThread : Application app = data.info.makeApplication(data.restrictedBackupMode, null);
+
+    note right of ActivityThread : we create the app now!
+
+    ActivityThread -> ActivityThread : mInitialApplication = app;\
+    \n first application instance for multi package app
+
+    alt data.restrictedBackupMode
+    else false
+        ActivityThread -> ActivityThread : installContentProviders(app, providers);
+        ActivityThread -> ActivityThread : mH.sendEmptyMessageDelayed(H.ENABLE_JIT, 10*1000);
+    end
+
+    ActivityThread -> ActivityThread : mInstrumentation.onCreate(data.instrumentationArgs);
+
+    ActivityThread -> ActivityThread : mInstrumentation.callApplicationOnCreate(app);
+end
+
+ <-- ActivityThread : bindApplication return
+
+deactivate ActivityThread
+@enduml

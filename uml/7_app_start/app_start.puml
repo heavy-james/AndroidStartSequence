@@ -1,5 +1,163 @@
 @startuml
 participant ActivityThread as "ActivityThread.java"
+participant ActivityManagerService as "ActivityManagerService.java"
+
+--> ActivityThread : call main() to start app
+
+activate ActivityThread
+
+ActivityThread -> ActivityThread : Environment.initForCurrentUser();\
+\n//set Environment user info for this process
+
+ActivityThread -> ActivityThread : AndroidKeyStoreProvider.install();\
+\n//add android keystores to java standard
+
+ActivityThread -> ActivityThread : TrustedCertificateStore.\
+\nsetDefaultUserDirectory(configDir);\
+
+ActivityThread -> ActivityThread : Process.setArgV0("<pre-initialized>");\
+\n//set process name
+
+ActivityThread -> ActivityThread : Looper.prepareMainLooper();
+
+ActivityThread -> ActivityThread : ActivityThread thread = new ActivityThread();
+
+ActivityThread -> ActivityThread : thread.attach(false);
 
 
+group attache(bool system)
+
+    ActivityThread -> ActivityThread : sCurrentActivityThread = this;\
+    \nmSystemThread = system;\
+    \n//cache thread and flag to static ref
+
+    ActivityThread -> ActivityThread : RuntimeInit.setApplicationObject\
+    \n(mAppThread.asBinder());\
+    \n//Set binder identifying this application/process,\
+    \n//for reporting VM errors.
+
+    ActivityThread -> ActivityThread : final IActivityManager mgr = \
+    \nActivityManagerNative.getDefault();\
+    \n//get ActivityManagerService instance from native
+
+    ActivityThread -> ActivityManagerService : attachApplication(mAppThread) // mAppThread is\
+    \n//default constructed ApplicationThread instance
+
+deactivate ActivityThread
+activate ActivityManagerService
+end
+
+
+group attachApplication
+ActivityManagerService -> ActivityManagerService : int callingPid = Binder.getCallingPid();
+
+ActivityManagerService -> ActivityManagerService : attachApplicationLocked(thread, callingPid);
+
+ActivityManagerService -> ActivityManagerService : check process record with pid,\
+ \n pid must not equals system server and > 0,\
+ \n process record must not be null,\
+ \n return false otherwise
+
+ActivityManagerService -> ActivityManagerService : check process record not attached\
+ \n with other activity thread, kill it otherwise
+
+ActivityManagerService -> ActivityManagerService : set up AppDeathRecipient,\
+ \n handle self death info
+
+ActivityManagerService -> ActivityManagerService : app.makeActive(thread, mProcessStats);\
+ \n//set up ProcessStats, make it active,\
+ \n//set thread as active process thread
+
+ActivityManagerService -> ActivityManagerService : updateProcessForegroundLocked(app, false, false);\
+\n// set up battery and oom observer to this process
+
+ActivityManagerService -> ActivityManagerService : removeMessages(PROC_START_TIMEOUT_MSG, app);\
+\n remove process start timeout watching
+
+ActivityManagerService -> ActivityManagerService : generateApplicationProvidersLocked(app);
+
+ActivityManagerService -> ActivityManagerService : sendMessageDelayed(msg, CONTENT_PROVIDER_PUBLISH_TIMEOUT);\
+\n watch content provider publish timeout if need.
+
+ActivityManagerService -> ActivityManagerService :  ensurePackageDexOpt(...)\
+\n //notify PackageManager opt dex if have not yet.
+
+ActivityManagerService -> ActivityManagerService : compatibilityInfoForPackageLocked(appInfo);\
+\n get compatibility info for package
+
+ActivityManagerService -> ActivityThread : bindApplication(...)
+deactivate ActivityManagerService
+activate ActivityThread
+end
+
+ActivityThread -> ActivityThread : handleBindApplication(...)
+
+ref over ActivityThread : bind_application.puml
+
+ActivityThread --> ActivityManagerService : bindApplication return
+
+
+deactivate ActivityThread
+activate ActivityManagerService
+
+ActivityManagerService -> ActivityManagerService : updateLruProcessLocked(app, false, null);
+
+ActivityManagerService -> ActivityManagerService : app.lastRequestedGc = app.lastLowMemory \
+\n = SystemClock.uptimeMillis();
+
+ActivityManagerService -> ActivityManagerService : mPersistentStartingProcesses.remove(app);
+
+ActivityManagerService -> ActivityManagerService : mProcessesOnHold.remove(app);
+
+ActivityManagerService -> ActivityManagerService : boolean badApp = false;
+
+ActivityManagerService -> ActivityManagerService : boolean didSomething = false;
+
+ActivityManagerService -> ActivityManagerService : mStackSupervisor.attachApplicationLocked(app);\
+\n//See if the top visible activity is waiting to run in this process,\
+\n//set badApp true, if exception occurs,\
+\n//set didSomething true, if found activity
+
+ref over ActivityManagerService : attach_application.puml
+
+alt badApp
+else false
+    ActivityManagerService -> ActivityManagerService : mServices.attachApplicationLocked(app, processName);\
+    \n//Find any services that should be running in this process\
+    \n//set didSomething true, if found service
+end
+
+alt badApp
+else false
+    ActivityManagerService -> ActivityManagerService : sendPendingBroadcastsLocked(app);\
+    \n//Check if a next-broadcast receiver is in this process\
+    \n//set didSomething true, if found broadcast receiver
+end
+
+alt badApp
+else false
+    ActivityManagerService -> ActivityManagerService : thread.scheduleCreateBackupAgent(...)\
+    \n//Check whether the next backup agent is in this process\
+    \n//set didSomething true, if found backup agent
+end
+
+alt badApp
+else true
+    ActivityManagerService -> ActivityManagerService : handleAppDiedLocked(app, false, true);
+end
+
+alt didSomething
+else false
+    ActivityManagerService -> ActivityManagerService : updateOomAdjLocked();
+end
+
+ActivityManagerService --> ActivityThread : attachApplication(mAppThread) return
+
+deactivate ActivityManagerService
+activate ActivityThread
+
+
+ActivityThread -> ActivityThread : Looper.loop();
+
+deactivate ActivityThread
 @enduml

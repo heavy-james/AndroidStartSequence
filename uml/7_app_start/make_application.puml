@@ -1,0 +1,89 @@
+@startuml
+
+participant LoadedApk as "LoadedApk.java"
+
+participant Instrumentation as "Instrumentation.java"
+
+participant Application as "Application.java"
+
+-> LoadedApk : makeApplication\
+\n(forceDefaultAppClass, instrumentation)
+
+activate LoadedApk
+
+alt mApplication
+else Not null
+<- LoadedApk : return mApplication
+end
+
+LoadedApk -> LoadedApk : String appClass = mApplicationInfo.className;
+
+alt forceDefaultAppClass
+    note right of LoadedApk : force use default app class to enable StrictMode
+else true
+     LoadedApk -> LoadedApk : appClass = "android.app.Application"
+end
+
+LoadedApk -> LoadedApk : initializeJavaContextClassLoader();\
+\n//for Not "android" package
+
+LoadedApk -> LoadedApk : ContextImpl appContext = ContextImpl.createAppContext(mActivityThread, this);\
+\n//create a new context instance for Application
+
+LoadedApk -> Instrumentation : Application app = newApplication(cl, appClass, appContext);
+
+deactivate LoadedApk
+activate Instrumentation
+
+Instrumentation -> Instrumentation : mActivityThread.mInstrumentation.newApplication\
+\n(cl.loadClass(className), context);\
+\n//use instrumentation in activity thread to make instance
+
+Instrumentation -> Application : reflection call newInstance
+
+deactivate Instrumentation
+activate Application
+
+Application -> Application : call default constructor
+
+Application --> Instrumentation : newInstance return
+
+deactivate Application
+activate Instrumentation
+
+Instrumentation -> Application : attach(appContext)
+deactivate Instrumentation
+activate Application
+
+Application -> Application : attachBaseContext(context);
+Application -> Application : mLoadedApk = ContextImpl.getImpl(context).mPackageInfo;
+Application --> Instrumentation : attach return
+deactivate Application
+activate Instrumentation
+
+Instrumentation --> LoadedApk : newApplication return
+
+deactivate Instrumentation
+activate LoadedApk
+
+LoadedApk -> LoadedApk : appContext.setOuterContext(app);\
+\n//export application as outer context
+
+LoadedApk -> LoadedApk : mActivityThread.mAllApplications.add(app);\
+\n//cache app to mAllApplications, multi dex support
+
+LoadedApk -> LoadedApk : mApplication = app;
+
+alt instrumentation
+else Not Null
+    LoadedApk -> LoadedApk : instrumentation.callApplicationOnCreate(app);
+    note right of LoadedApk : notify given instrumentation application onCreate
+end
+
+LoadedApk -> LoadedApk : Rewrite the R 'constants' for all library apks.
+
+<-- LoadedApk : return app.
+
+deactivate LoadedApk
+
+@enduml

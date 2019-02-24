@@ -1,0 +1,47 @@
+@startuml
+participant ContextImpl as "ContextImpl.java"
+
+
+-> ContextImpl : createAppContext(...)
+
+activate ContextImpl
+ContextImpl -> ContextImpl : translate args and call constructor
+
+
+group Constructor
+
+ContextImpl -> ContextImpl : mOuterContext = this;\
+\n//init outer context as self
+
+ContextImpl -> ContextImpl : mMainThread = mainThread;\
+\n//save mainThread
+
+ContextImpl -> ContextImpl : mActivityToken = activityToken;\
+\n//save binder token
+
+ContextImpl -> ContextImpl : mRestricted = restricted;
+
+ContextImpl -> ContextImpl : mUser = user;\
+\n//init mUser
+
+ContextImpl -> ContextImpl : mPackageInfo = packageInfo;\
+\n//save LoadedApk instance
+
+ContextImpl -> ContextImpl : mResourcesManager = ResourcesManager.getInstance();\
+\n//init mResourcesManager
+
+ContextImpl -> ContextImpl : mDisplayAdjustments.setCompatibilityInfo(compatInfo);\
+\n//apply compatibility to display
+
+ContextImpl -> ContextImpl : init mResources\
+\n// init Resource instance for context
+
+ContextImpl -> ContextImpl : init mBasePackageName & mOpPackageName
+
+ContextImpl -> ContextImpl : mContentResolver = new ApplicationContentResolver(this, mainThread, user);\
+\n//create ContentResolver instance
+
+end
+<-- ContextImpl : return
+deactivate ContextImpl
+@enduml

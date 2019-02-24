@@ -97,11 +97,15 @@ deactivate ActivityStackSupervisor
 
 
 activate ActivityManagerService
+ActivityManagerService -> ActivityManagerService : clean old process record related this pid
+ActivityManagerService -> ActivityManagerService : init process record arguments
+ActivityManagerService -> ActivityManagerService : notify cpu, battery stats service for this process
 ActivityManagerService -> Process : start(...)
-deactivate ActivityManagerService
-
-
 activate Process
+ActivityManagerService -> ActivityManagerService : send PROC_START_TIMEOUT_MSG message,\
+ \n in case start timeout.
+
+
 Process -> Process : startViaZygote(...)
 Process -> Process : translate args for zygote
 Process ->  : zygoteSendArgsAndGetResult\n(openZygoteSocketIfNeeded(abi), argsForZygote);\
@@ -109,9 +113,6 @@ Process ->  : zygoteSendArgsAndGetResult\n(openZygoteSocketIfNeeded(abi), argsFo
 ref over Process : app_start_wrapper.puml
 
 deactivate Process
-
-
-
-
+deactivate ActivityManagerService
 deactivate ActivityStackSupervisor
 @enduml
