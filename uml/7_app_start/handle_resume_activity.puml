@@ -1,73 +1,89 @@
 @startuml
 participant ActivityThread as "ActivityThread.java"
-participant Instrumentation as "Instrumentation.java"
 participant Activity as "Activity.java"
 
 -> ActivityThread : handleResumeActivity()
 
 activate ActivityThread
 
-ActivityThread -> ActivityThread : performResumeActivity(token, clearHide)
-
-group performResumeActivity
+ref over ActivityThread : activity_supervisor_attach_application.puml #step2
 
 ActivityThread -> ActivityThread : ActivityClientRecord r = mActivities.get(token);
 
-    alt r
-    else r != null && !r.activity.mFinished
+alt record
+else r != null && !r.activity.mFinished
 
-        ActivityThread -> ActivityThread : r.activity.onStateNotSaved();
+    ActivityThread -> ActivityThread : r.activity.onStateNotSaved();
 
-        ActivityThread -> ActivityThread : r.activity.mFragments.noteStateNotSaved();
+    ActivityThread -> ActivityThread : r.activity.mFragments.noteStateNotSaved();
 
-        ActivityThread -> ActivityThread : deliverNewIntents(r, r.pendingIntents);//if need
+    ActivityThread -> ActivityThread : deliverNewIntents(r, r.pendingIntents);//if need
 
-        ActivityThread -> ActivityThread : deliverResults(r, r.pendingResults);//if need
+    ActivityThread -> ActivityThread : deliverResults(r, r.pendingResults);//if need
 
-        ActivityThread -> Activity : r.activity.performResume();
+    ActivityThread -> Activity : r = r.activity.performResume();
 
-        deactivate ActivityThread
-        activate Activity
+    deactivate ActivityThread
+    activate Activity
 
-        Activity -> Activity : performRestart();
+    ref over Activity : activity_on_resume.puml
 
-        group performRestart
+    Activity --> ActivityThread : performResume return r
 
-            Activity -> Activity : mFragments.noteStateNotSaved();
+    deactivate Activity
+    activate ActivityThread
 
-            alt mStopped //resume from stopped state
-            else true
-                Activity -> Activity : WindowManagerGlobal.getInstance().\
-                \n setStoppedState(mToken, false);
+    alt r.activity
+    else Not Null
 
-                Activity -> Activity : mCalled = false;
+        ActivityThread -> ActivityThread : final Activity a = r.activity;
 
-                Activity -> Activity : callActivityOnRestart(this);\
-                \n//just dispatching call onRestart() to activity here
+        ActivityThread -> ActivityThread : boolean willBeVisible = !a.mStartedActivity;\
+        \n//did this activity started another one?
 
-            end
-
-
-            Activity -> Activity :
-
+        alt r.window, a.mFinished, willBeVisible
+        else Null && false && true
+            ActivityThread -> ActivityThread : //attach widow from activity to record,\
+            \n//attach decor view from window  to activity,\
+            \n//init layout param with flag TYPE_BASE_APPLICATION,\
+            \n//add decor view to WindowManager
         end
 
-        Activity -> Activity :
-        Activity -> Activity :
-        Activity -> Activity :
-        Activity -> Activity :
 
-        ActivityThread -> ActivityThread : r.paused = false;
-        ActivityThread -> ActivityThread : r.stopped = false;
-        ActivityThread -> ActivityThread : r.state = null;
-        ActivityThread -> ActivityThread : r.persistentState = null;
+        ActivityThread -> ActivityThread : cleanUpPendingRemoveWindows(r);
+
+        alt a.mFinished, willBeVisible
+        else false && true
+            ActivityThread -> ActivityThread : performConfigurationChanged(r.activity, r.tmpConfig)//if need
+
+            ActivityThread -> ActivityThread : handle flag SOFT_INPUT_IS_FORWARD_NAVIGATION
+
+            ActivityThread -> Activity : r.activity.makeVisible();
+
+            deactivate ActivityThread
+            activate Activity
+
+            Activity -> Activity : add decor view to WindowManger if need
+            Activity -> Activity : mDecor.setVisibility(View.VISIBLE);
+            Activity --> ActivityThread : makeVisible return
+
+            deactivate Activity
+            activate ActivityThread
+        end
+
+        ActivityThread -> ActivityThread : Looper.myQueue().addIdleHandler(new Idler());\
+        \n//notify ActivityManager self-idled if !r.onlyLocalRequest
+
+        ActivityThread -> ActivityThread : ActivityManagerNative.getDefault().activityResumed(token);\
+        \n// tell ActivityManager self-resumed if arg reallyResume is true
+    else Null
+
+        ActivityThread -> ActivityThread : ActivityManagerNative.getDefault().finishActivity\
+        \n (token, Activity.RESULT_CANCELED, null, false);
     end
-
 end
-ActivityThread -> ActivityThread :
 
-ActivityThread -> ActivityThread :
-
-
+<-- ActivityThread : handleResumeActivity finished
 deactivate ActivityThread
+
 @enduml

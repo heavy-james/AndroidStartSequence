@@ -6,91 +6,99 @@ participant ActivityThread as "ActivityThread.java"
 -> ActivityStackSupervisor : attachApplicationLocked\
 \n(ProcessRecord app)
 
-
+ref over ActivityStackSupervisor : app_start.puml #step2
 
 activate ActivityStackSupervisor
-ActivityStackSupervisor -> ActivityStackSupervisor : find top activity record from front stack
+ActivityStackSupervisor -> ActivityStackSupervisor : find top activity record "hr" from front stack
 
-ActivityStackSupervisor -> ActivityStackSupervisor : if record's uid, process equals app's, call\
-\nrealStartActivityLocked(record, app, true, true)
+ActivityStackSupervisor -> ActivityStackSupervisor : if hr.app(the process record) is null &&\
+ \n uid and process name in hr equals app's, call\
+\n realStartActivityLocked(record, app,\
+\n andResume : true, checkConfig : true);
 
 group realStartActivityLocked
 
-alt andResume
-else true
-    ActivityStackSupervisor -> ActivityStackSupervisor : notify WindowManager visible this app
-end
-
-alt checkConfig
-else true
-    ActivityStackSupervisor -> ActivityStackSupervisor : notify WindowManager, ActivityManagerService to update config
-end
-
-ActivityStackSupervisor -> ActivityStackSupervisor : r.app = app;//set app to activity record
-
-ActivityStackSupervisor -> ActivityStackSupervisor : app.activities.add(r);// add record to app if need.
-
-ActivityStackSupervisor -> ActivityStackSupervisor : mService.updateLruProcessLocked(app, true, null);
-
-ActivityStackSupervisor -> ActivityStackSupervisor : mService.updateOomAdjLocked();
-
-ActivityStackSupervisor -> ActivityThread : scheduleLaunchActivity(...)
-
-deactivate ActivityStackSupervisor
-activate ActivityThread
-
-ActivityThread -> ActivityThread: updateProcessState(procState, false);
-
-ActivityThread -> ActivityThread: ActivityClientRecord r = new ActivityClientRecord();
-
-ActivityThread -> ActivityThread: infalte r with args
-
-ActivityThread -> ActivityThread: updatePendingConfiguration(curConfig);
-
-ActivityThread -> ActivityThread: sendMessage(H.LAUNCH_ACTIVITY, r);
-
-ActivityThread -> ActivityThread: messasge handler call handleLaunchActivity\
-\n(ActivityClientRecord r, Intent customIntent)
-
-group handleLaunchActivity
-
-    ActivityThread -> ActivityThread: WindowManagerGlobal.initialize();
-
-    ActivityThread -> ActivityThread: Activity a = performLaunchActivity(r, customIntent);
-
-    ref over ActivityThread : perform_launch_activity.puml
-
-    alt a
-    else Not null
-        ActivityThread -> ActivityThread: handleResumeActivity(r.token, false, r.isForward,\
-        \n!r.activity.mFinished && !r.startsNotResumed);
-
-        ref over ActivityThread : handle_resume_activity.puml
+    alt andResume
+    else true
+        ActivityStackSupervisor -> ActivityStackSupervisor : notify WindowManager visible this app
     end
 
+    alt checkConfig
+    else true
+        ActivityStackSupervisor -> ActivityStackSupervisor : notify WindowManager, ActivityManagerService to update config
+    end
 
-    ActivityThread -> ActivityThread:
+    ActivityStackSupervisor -> ActivityStackSupervisor : r.app = app;//set app to activity record
 
-    ActivityThread -> ActivityThread:
+    ActivityStackSupervisor -> ActivityStackSupervisor : app.activities.add(r);// add record to app if need.
 
-    ActivityThread -> ActivityThread:
+    ActivityStackSupervisor -> ActivityStackSupervisor : mService.updateLruProcessLocked(app, true, null);
 
-    ActivityThread -> ActivityThread:
+    ActivityStackSupervisor -> ActivityStackSupervisor : mService.updateOomAdjLocked();
 
-    ActivityThread -> ActivityThread:
+    ActivityStackSupervisor -> ActivityThread : scheduleLaunchActivity(...)
+
+    deactivate ActivityStackSupervisor
+    activate ActivityThread
+
+    ActivityThread -> ActivityThread: updateProcessState(procState, false);
+
+    ActivityThread -> ActivityThread: ActivityClientRecord r = new ActivityClientRecord();
+
+    ActivityThread -> ActivityThread: infalte r with args
+
+    ActivityThread -> ActivityThread: updatePendingConfiguration(curConfig);
+
+    ActivityThread -> ActivityThread: sendMessage(H.LAUNCH_ACTIVITY, r);
+
+    ActivityThread -> ActivityThread: messasge handler call handleLaunchActivity\
+    \n(ActivityClientRecord r, Intent customIntent)
+
+    group handleLaunchActivity
+
+        ActivityThread -> ActivityThread: WindowManagerGlobal.initialize();
+
+        ActivityThread -> ActivityThread: step1. Activity activity = performLaunchActivity(r, customIntent);
+
+        ref over ActivityThread : perform_launch_activity.puml
+
+        alt activity
+        else Not null
+            ActivityThread -> ActivityThread: step2. handleResumeActivity(r.token, false, r.isForward,\
+            \n!r.activity.mFinished && !r.startsNotResumed);
+
+            ref over ActivityThread : handle_resume_activity.puml
+        end
+
+        alt andResume
+        else true
+            ActivityThread -> ActivityThread: : stack.minimalResumeActivityLocked();\
+            \n//notify ActivityStack update resume data
+        else false
+            ActivityThread -> ActivityThread: r.state = STOPPED; \
+            \nr.stopped = true;
+        end
+
+        alt isFrontStack(stack)
+        else true
+            ActivityThread -> ActivityThread: mService.startSetupActivityLocked();\
+            \n not really understand here
+        end
+
+
+        ActivityThread -> ActivityThread: mService.mServices.updateServiceConnectionActivitiesLocked(r.app);\
+        \n// do update as the method name told
+
+    end
 
 end
 
+ActivityThread --> ActivityStackSupervisor : return true
 
-ActivityStackSupervisor -> ActivityStackSupervisor :
+deactivate ActivityThread
+activate ActivityStackSupervisor
 
-ActivityStackSupervisor -> ActivityStackSupervisor :
-
-ActivityStackSupervisor -> ActivityStackSupervisor :
-
-ActivityStackSupervisor -> ActivityStackSupervisor :
-
-ActivityStackSupervisor -> ActivityStackSupervisor :
+<-- ActivityStackSupervisor : return didSomething
 
 deactivate ActivityStackSupervisor
 

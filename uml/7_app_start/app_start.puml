@@ -90,7 +90,7 @@ deactivate ActivityManagerService
 activate ActivityThread
 end
 
-ActivityThread -> ActivityThread : handleBindApplication(...)
+ActivityThread -> ActivityThread : step1. handleBindApplication(...)
 
 ref over ActivityThread : bind_application.puml
 
@@ -113,7 +113,7 @@ ActivityManagerService -> ActivityManagerService : boolean badApp = false;
 
 ActivityManagerService -> ActivityManagerService : boolean didSomething = false;
 
-ActivityManagerService -> ActivityManagerService : mStackSupervisor.attachApplicationLocked(app);\
+ActivityManagerService -> ActivityManagerService : step2. mStackSupervisor.attachApplicationLocked(app);\
 \n//See if the top visible activity is waiting to run in this process,\
 \n//set badApp true, if exception occurs,\
 \n//set didSomething true, if found activity

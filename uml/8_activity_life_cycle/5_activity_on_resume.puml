@@ -1,7 +1,74 @@
 @startuml
 participant ActivityThread as "ActivityThread.java"
-participant Instrumentation as "Instrumentation.java"
 participant Activity as "Activity.java"
+participant Instrumentation as "Instrumentation.java"
 
+ActivityThread -> Activity : r.activity.performResume();
+
+activate Activity
+
+Activity -> Activity : performRestart();
+
+ref over Activity : activity_on_restart.puml
+
+Activity -> Activity : mFragments.execPendingActions();
+
+Activity -> Activity : mLastNonConfigurationInstances = null;
+
+Activity -> Activity : mCalled = false;
+
+Activity -> Instrumentation : callActivityOnResume(this);
+
+deactivate Activity
+activate Instrumentation
+
+Instrumentation -> Instrumentation : activity.mResumed = true;
+
+Instrumentation -> Activity : activity.onResume();
+
+deactivate Instrumentation
+activate Activity
+
+Activity --> Instrumentation : onResume return
+
+deactivate Activity
+activate Instrumentation
+
+Instrumentation --> Activity : callActivityOnResume return
+
+deactivate Instrumentation
+activate Activity
+
+alt mCalled
+else false
+    ActivityThread <-- Activity : throw new SuperNotCalledException(...)
+end
+
+alt mVisibleFromClient, mFinished
+else false&&false
+    ActivityThread <-- Activity : throw new IllegalStateException("Activity " \
+    \n + mComponent.toShortString() + \
+    \n " did not call finish() prior to onResume() completing");)
+
+end
+
+note right of Activity : dispatch resume action to fragments now!
+
+Activity -> Activity : mFragments.dispatchResume();
+
+
+Activity -> Activity : mCalled = false;
+
+Activity -> Activity : onPostResume();
+
+alt mCalled
+else false
+
+    ActivityThread <-- Activity : throw new SuperNotCalledException(...)
+end
+
+ActivityThread <-- Activity : performResume finished
+
+deactivate Activity
 
 @enduml

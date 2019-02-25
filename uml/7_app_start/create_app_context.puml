@@ -3,6 +3,9 @@ participant ContextImpl as "ContextImpl.java"
 
 
 -> ContextImpl : createAppContext(...)
+ref over ContextImpl : bind_application.puml #step1
+ref over ContextImpl : create_specified_instrumentation.puml #step1
+
 
 activate ContextImpl
 ContextImpl -> ContextImpl : translate args and call constructor

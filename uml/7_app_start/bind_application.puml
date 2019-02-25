@@ -5,6 +5,8 @@ participant ActivityManagerService as "ActivityManagerService.java"
 
 -> ActivityThread : bindApplication(...)
 
+ref over ActivityThread : app_start.puml #step1
+
 deactivate ActivityManagerService
 
 activate ActivityThread
@@ -41,7 +43,7 @@ group handleBindApplication
     ActivityThread -> ActivityThread : updateDefaultDensity();\
     \n//apply density config to DisplayMetrics and BitMap
 
-    ActivityThread -> ActivityThread : ContextImpl.createAppContext(this, data.info);\
+    ActivityThread -> ActivityThread : step1. ContextImpl.createAppContext(this, data.info);\
     \n//create Application context with LoadedApk instance
 
     note right of ActivityThread : we just create context here, not application
@@ -82,7 +84,7 @@ group handleBindApplication
 
     alt data.instrumentationName
     else Not Null
-        ActivityThread -> ActivityThread : mInstrumentation = "create specified instrumentation"
+        ActivityThread -> ActivityThread : step2. mInstrumentation = "create specified instrumentation"
 
         ref over ActivityThread : create_specified_instrumentation.puml
     else Null
