@@ -25,7 +25,7 @@ the global sight sequence shows below, it is wrote in Chinese, only for this one
 
 ## Contact Me
 
-if anything need to correct or complete, just let me known.
+if anything needs to be corrected or completed, just let me known.
 
 Email: heavy0x0james@gmail.com, zhanhaifei@126.com
 
