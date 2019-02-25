@@ -16,6 +16,8 @@ participant SystemServer as "SystemServer"
 
 participant ActivityManagerService as "ActivityManagerService.java"
 
+participant ActivityThread as "ActivityThread.java"
+
 'sequence below
 
 activate PowerOn
@@ -66,14 +68,44 @@ SystemServer -> SystemServer : startOtherServices
 SystemServer -> ActivityManagerService : 调用systemReady\n通知启动Launcher
 
 activate ActivityManagerService
-ActivityManagerService -> ActivityManagerService : 检查进程和Activity记录，调度Activity
+ActivityManagerService -> ActivityManagerService : 检查进程和Activity记录，调度Activity到栈顶
 ActivityManagerService -> ActivityManagerService : 通过Process.start启动新进程，\n向Zygote发送start命令
+ActivityManagerService -> ActivityManagerService : 监听App进程启动超时
 ActivityManagerService -> ActivityManagerService : Zygote fork出子进程，返回pid
 ActivityManagerService -> ActivityManagerService : 执行通用runtime初始化
-ActivityManagerService -> ActivityManagerService : 创建ActivityThread,运行Application
-ActivityManagerService -> ActivityManagerService : xxx
-ActivityManagerService -> ActivityManagerService : 等待用户操作
+ActivityManagerService -> ActivityThread : 创建ActivityThread
 
+activate ActivityThread
+ActivityThread -> ActivityThread : 创建ApplicationThread，作为Binder通信客户端
+ActivityThread -> ActivityManagerService : 调用attach方法，将ApplicationThread和App进程信息绑定
+deactivate ActivityThread
+
+activate ActivityManagerService
+ActivityManagerService -> ActivityManagerService : 检查App进程信息，并进行相关初始化
+ActivityManagerService -> ActivityManagerService : 移除App启动超时监听
+ActivityManagerService -> ActivityManagerService : 执行dex字节码对齐
+ActivityManagerService --> ActivityThread :
+deactivate ActivityManagerService
+
+activate ActivityThread
+
+ActivityThread -> ActivityThread : 创建Application实例,初始化硬件、资源、配置等信息, \
+\n打开相关的监听器和调试器
+
+ActivityThread -> ActivityThread : 发布ContentProvider
+
+ActivityThread -> ActivityThread : 创建Instrumentation对象，回调onCreate方法
+
+ActivityThread -> ActivityThread : 调用ActivityStackSupervisor的attach方法，\
+\n拉起之前调度在顶的Activity
+
+ActivityThread -> ActivityThread : 调用attach方法，启动静态注册的服务的
+
+ActivityThread -> ActivityThread : 注册并分发事件到静态广播
+
+ActivityThread -> ActivityThread : 等待用户操作
+
+deactivate ActivityThread
 deactivate ActivityManagerService
 deactivate SystemServer
 deactivate Zygote

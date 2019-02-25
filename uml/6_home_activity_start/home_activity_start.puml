@@ -89,7 +89,8 @@ ActivityStackSupervisor -> ActivityStackSupervisor : ProcessRecord app = mServic
 alt app
 else not null
    ActivityStackSupervisor -> ActivityStackSupervisor : realStartActivityLocked()\
-   //todo: expand this logic
+   \n//if process already exists, start activity right now.
+   ref over  ActivityStackSupervisor : activity_supervisor_attach_application.puml
 end
 
 ActivityStackSupervisor -> ActivityManagerService : startProcessLocked(...)
