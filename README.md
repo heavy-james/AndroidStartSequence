@@ -21,7 +21,7 @@ read them from the begginning, enjoy it.
 
 the global sight sequence shows below, it is wrote in Chinese, only for this one:
 
-![image.png](https://upload-images.jianshu.io/upload_images/10880092-c65c97cabe8618aa.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+![github read me](https://upload-images.jianshu.io/upload_images/10880092-5742ebda33e305fc.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
 
 ## Contact Me
 
