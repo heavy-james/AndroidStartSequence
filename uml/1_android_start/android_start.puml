@@ -94,12 +94,12 @@ ActivityThread -> ActivityThread : 创建Application实例,初始化硬件、资
 
 ActivityThread -> ActivityThread : 发布ContentProvider
 
-ActivityThread -> ActivityThread : 创建Instrumentation对象，回调onCreate方法
+ActivityThread -> ActivityThread : 创建Instrumentation对象，回调Application的onCreate方法
 
 ActivityThread -> ActivityThread : 调用ActivityStackSupervisor的attach方法，\
-\n拉起之前调度在顶的Activity
+\n拉起之前调度在栈顶的Activity
 
-ActivityThread -> ActivityThread : 调用attach方法，启动静态注册的服务的
+ActivityThread -> ActivityThread : 调用attach方法，启动静态注册的服务
 
 ActivityThread -> ActivityThread : 注册并分发事件到静态广播
 
